@@ -10,7 +10,7 @@ This tool pulls data from Fritz, uses SNID to classify transients, and uploads c
 
 ## Installation
 
-Installation of SNID is detailed on the above link. Ensure that its dependencies (PGPLOT) are installed. Enter in the location the SNID executable is located in `snid.py`.
+Installation of SNID is detailed on the above link. Ensure that its dependencies (PGPLOT) are installed. It is highly recommended to download the updated and more extensive template list, which can be found under `templates-2.0` in the above link. Enter in the location the SNID executable is located in `snid.py`.
 
 Generate your unique Fritz API token by going to your [profile](https://fritz.science/profile), finding "Generate New Token for Command-Line Authentication", entering in a name (this is not important), checking all the boxes, and clicking "generate token". Copy the token and enter it in `func.py`.
 
