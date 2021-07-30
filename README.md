@@ -37,7 +37,7 @@ Enter in the earliest date you want to check classifications or saves (YYYY-MM-D
 'y' for yesterday at midnight, or enter nothing to select last time program was run:
 ```
 
-In most cases, you will want to look for newly classified or saved transients from the previous day, so entering `y` is generally acceptable (if more than one day since last running, such as Monday, enter in the date of last use). However, since the code is often run multiple times in one day, the last time the program was run is often too recent. The code also saves the last time it was run, so if you want to choose this enter in nothing. If for whatever reason you want to look at objects saved earlier, you can enter in this date in the appropriate format.
+In most cases, you will want to look for newly classified or saved transients from the previous day, so entering `y` is generally acceptable (if more than one day since last running, such as Monday, enter in the date of last use). The code also saves the last time it was run, so if you want to choose this enter in nothing. However, since the code is often run multiple times in one day, the last time the program was run is often too recent. If for whatever reason you want to look at objects saved earlier, you can enter in this date in the appropriate format.
 
 ### Redshift Determination for Classified Sources
 
