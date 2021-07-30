@@ -74,6 +74,11 @@ Once you select the correct spectrum, the code will generate a TNS report, which
 
 After completing all in the list, the script will indicate that the submission process is complete.
 
+## Plans
+
+- [] Include additional classification techniques using photometry
+- [] Assess the feasibility of including RCF checking using the photometry curves
+
 ## Acknowledgements
 
 A majority of the TNS submission code has been provided for use by Aishwarya Dahiwale from her own [repository](https://github.com/Aishwarya113/TNS-Classification).
