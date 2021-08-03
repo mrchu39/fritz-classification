@@ -76,7 +76,7 @@ After completing all in the list, the script will indicate that the submission p
 ## Plans
 
 - [ ] Include additional classification techniques using photometry.
-- [ ] Assess the feasibility of including RCF checking using the photometry curves.
+- [ ] Include RCF checking through the API and with photometry curves.
 
 ## Changelog
 
