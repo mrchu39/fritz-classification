@@ -1,30 +1,28 @@
 from __future__ import print_function
+
+import astropy.units as u
+import datetime
+import json
+import os, glob2
 import numpy as np
 import pandas as pd
-import os, glob2
-import requests, json
-from lxml import html
-from astropy.time import Time
 import pickle
-from astropy.table import Table
-from astropy.io import ascii
-import os
-import requests
-import json
-import datetime
-from astropy.cosmology import FlatLambdaCDM
-import astropy.units as u
-from astropy import constants as const
-import sys, getopt, argparse
 import re
-from time import sleep
-from astropy.io import fits
-from subprocess import call
-from lxml import html
+import requests, json
+import sys, getopt, argparse
 import webbrowser as wb
-from urllib.error import HTTPError
 import xlsxwriter
+
+from astropy import constants as const
+from astropy.cosmology import FlatLambdaCDM
+from astropy.io import ascii, fits
+from astropy.table import Table
+from astropy.time import Time
+from lxml import html
+from subprocess import call
+from time import sleep
 from tqdm import tqdm
+from urllib.error import HTTPError
 
 if 'info.info' not in os.listdir(os.getcwd()): # Retrieves API key info and location of SNID
     print('No info file in directory! "info.info" has been generated, enter in the location of SNID, and API information.')

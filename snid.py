@@ -1,16 +1,17 @@
-import shlex
-import subprocess
-from astropy.io import ascii
+import matplotlib.pyplot as plt
 import numpy as np
 import os
+import shlex
+import shutil
+import subprocess
 import sys
 import time
-import shutil
-import matplotlib.pyplot as plt
+
+from astropy.io import ascii
 from func import *
 
 with open('info.info', 'r') as f:
-    SNID_loc = f.read().split('\n')[0][9:].strip()
+    SNID_loc = f.read().split('\n')[0].split(':')[1].strip()
 
 def snid_analyze(source):
 
@@ -122,69 +123,6 @@ def snid_analyze(source):
 
     return typ[np.argmax(frac)], frac[np.argmax(frac)], red[np.argmax(frac)], red_err[np.argmax(frac)]
 
-def run_class(unclassifys):
-
-    ''' Info : Runs SNID analysis on list of sources
-        Input : list of unclassified sources
-        Returns : transients, SNID classifications, rlap scores, redshifts, redshift errors
-    '''
-
-    print('Clearing directories...')
-
-    # Delete all SNID-generated files to save storage and not confuse the code
-    files = os.listdir(os.getcwd())
-
-    test = os.listdir(os.getcwd()+'/data')
-    for item in test:
-        if item.endswith(".ascii"):
-            os.remove(os.path.join(os.getcwd()+'/data', item))
-
-    if 'outfiles' in files:
-        test = os.listdir(os.getcwd()+'/outfiles')
-        for item in test:
-            shutil.rmtree(os.path.join(os.getcwd()+'/outfiles', item))
-    else:
-        os.mkdir('outfiles')
-
-    test = os.listdir(os.getcwd())
-    for item in test:
-        if item.startswith("ZTF"):
-            os.remove(os.path.join(os.getcwd(), item))
-
-    transients = []
-    types = []
-    rlaps = []
-    reds = []
-    red_errs = []
-
-    print('There are ' + str(len(unclassifys)) + ' unclassified transients.')
-
-    for s in np.arange(0,len(unclassifys)):
-        print(bcolors.OKCYAN + str(s+1) + '/' + str(len(unclassifys)) + bcolors.ENDC + ': ' + bcolors.OKBLUE + unclassifys[s] + bcolors.ENDC)
-        t, f, r, re = snid_analyze(unclassifys[s])
-
-        if t != None:
-            if t == 'II':
-                t = 'Type II'
-            elif t == 'Gal':
-                t = 'Galactic Nuclei'
-            transients.append(unclassifys[s])
-            types.append(t)
-            rlaps.append(f)
-            reds.append(r)
-            red_errs.append(re)
-
-    # Saves a csv of classified sources -- can be commented out if necessary
-    np.savetxt('SNID_fits.csv', np.rot90(np.fliplr(np.vstack((transients, types, rlaps, reds, red_errs)))), delimiter=',', fmt='%s')
-
-    # Clear the data directory to avoid issues with the submission code
-    test = os.listdir(os.getcwd()+'/data')
-    for item in test:
-        if item.endswith(".ascii"):
-            os.remove(os.path.join(os.getcwd()+'/data', item))
-
-    return transients, types, rlaps, reds, red_errs
-
 def submit_reds(no_reds):
 
     ''' Info : Submits redshift information to Fritz
@@ -256,3 +194,66 @@ def submit_class(unclassifys):
                 f['Classification Date'][np.argwhere(f['Source Name'] == transients[tr])] = str(datetime.date.today())
 
             f.write('RCF_sources.ascii', format='ascii', overwrite=True, delimiter='\t')
+
+def run_class(unclassifys):
+
+    ''' Info : Runs SNID analysis on list of sources
+        Input : list of unclassified sources
+        Returns : transients, SNID classifications, rlap scores, redshifts, redshift errors
+    '''
+
+    print('Clearing directories...')
+
+    # Delete all SNID-generated files to save storage and not confuse the code
+    files = os.listdir(os.getcwd())
+
+    test = os.listdir(os.getcwd()+'/data')
+    for item in test:
+        if item.endswith(".ascii"):
+            os.remove(os.path.join(os.getcwd()+'/data', item))
+
+    if 'outfiles' in files:
+        test = os.listdir(os.getcwd()+'/outfiles')
+        for item in test:
+            shutil.rmtree(os.path.join(os.getcwd()+'/outfiles', item))
+    else:
+        os.mkdir('outfiles')
+
+    test = os.listdir(os.getcwd())
+    for item in test:
+        if item.startswith("ZTF"):
+            os.remove(os.path.join(os.getcwd(), item))
+
+    transients = []
+    types = []
+    rlaps = []
+    reds = []
+    red_errs = []
+
+    print('There are ' + str(len(unclassifys)) + ' unclassified transients.')
+
+    for s in np.arange(0,len(unclassifys)):
+        print(bcolors.OKCYAN + str(s+1) + '/' + str(len(unclassifys)) + bcolors.ENDC + ': ' + bcolors.OKBLUE + unclassifys[s] + bcolors.ENDC)
+        t, f, r, re = snid_analyze(unclassifys[s])
+
+        if t != None:
+            if t == 'II':
+                t = 'Type II'
+            elif t == 'Gal':
+                t = 'Galactic Nuclei'
+            transients.append(unclassifys[s])
+            types.append(t)
+            rlaps.append(f)
+            reds.append(r)
+            red_errs.append(re)
+
+    # Saves a csv of classified sources -- can be commented out if necessary
+    np.savetxt('SNID_fits.csv', np.rot90(np.fliplr(np.vstack((transients, types, rlaps, reds, red_errs)))), delimiter=',', fmt='%s')
+
+    # Clear the data directory to avoid issues with the submission code
+    test = os.listdir(os.getcwd()+'/data')
+    for item in test:
+        if item.endswith(".ascii"):
+            os.remove(os.path.join(os.getcwd()+'/data', item))
+
+    return transients, types, rlaps, reds, red_errs
