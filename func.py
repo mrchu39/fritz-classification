@@ -26,13 +26,19 @@ from urllib.error import HTTPError
 import xlsxwriter
 from tqdm import tqdm
 
+with open('info.info', 'r') as f:
+    info = f.read().split('\n')
+    ft = info[1][14:].strip()
+    tns_apikey = info[2][12:].strip()
+    tns_botid = info[3][11:].strip()
+
 global TOKEN, BASEURL
-GETTOKEN = ''      # Unique Fritz API Key, input your TOKEN from Fritz
+GETTOKEN = ft      # Fritz API Key, retrieves from info file
 BASEURL = 'https://fritz.science/'                     # Fritz base url
 
-API_KEY = ""     # TNS API Key - DO NOT CHANGE
-YOUR_BOT_ID = ""
-YOUR_BOT_NAME = "ZTF_Bot1"
+API_KEY = tns_apikey     # TNS API Key from info file
+YOUR_BOT_ID = tns_botid
+YOUR_BOT_NAME="ZTF_Bot1"
 
 # TNS URLs for real uploads
 TNS_BASE_URL = "https://www.wis-tns.org/api/"
@@ -136,19 +142,25 @@ class TNSClassificationReport:
 
         return json.dumps(self.fill())
 
-def api(method, endpoint, data=None):
+def api(method, endpoint, data=None, params=None):
     ''' Info : Basic API query, takes input the method (eg. GET, POST, etc.), the endpoint (i.e. API url)
                and additional data for filtering
         Returns : response in json format
         CAUTION! : If the query doesn't go through, try putting the 'data' input in 'data' or 'params'
                     argument in requests.request call
     '''
-    headers = {'Authorization': f'token {GETTOKEN}'}
-    response = requests.request(method, endpoint, json=data, headers=headers)
 
-    while '429 Too Many Requests' in response.text:
-        sleep(0.01)
-        response = requests.request(method, endpoint, json=data, headers=headers)
+    headers = {'Authorization': f'token {GETTOKEN}'}
+
+    while True:
+        try:
+            response = requests.request(method, endpoint, json=data, headers=headers, params=params, timeout=3)
+        except requests.exceptions.Timeout:
+            continue
+
+        if '429 Too Many Requests' not in response.text:
+            break
+
     return response.json()
 
 def get_source_api(ztfname):
@@ -422,6 +434,7 @@ def get_required_spectrum_id(ztfname, auto=False):
     spec = (get_all_spectra_len(ztfname))
 
     name = []
+    instids = []
     date = []
 
     if spec == 0:
@@ -444,14 +457,16 @@ def get_required_spectrum_id(ztfname, auto=False):
 
             spec_name = response['data']['spectra'][s]['original_file_filename']
             spec_date = response['data']['spectra'][s]['observed_at']
+            instid = response['data']['spectra'][s]['id']
 
             name.append(spec_name)
             date.append(spec_date.split('T')[0])
+            instids.append(instid)
 
         print ("Please choose from the following spectra (enter 0 to resume): \a\n")
 
         for i in range (len(name)):
-            print ((i+1),")", "spectrum name: ", name[i], "spectrum date:", date[i])
+            print ((i+1),")", "instrument id: ", instids[i], "spectrum name: ", name[i], "spectrum date:", date[i])
 
         wb.open(BASEURL+'source/'+ztfname, new=2)
 
@@ -850,6 +865,7 @@ def get_number(group_id, date):
 
     url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id+'&savedAfter='+date+'T00:00:00.000001'
     response = api('GET',url)
+
     return len(response['data']['sources'])
 
 def get_sources(group_id, date):
@@ -877,7 +893,7 @@ def get_TNS_classification_ID(classification):
         Returns : TNS ID
     '''
 
-    class_ids = {"Other": 0, "Supernova": 1, "Type I": 2, "Ia": 3, "Ib": 4, "Ic": 5, "Ib/c": 6, "Ic-BL": 7, "Ib-Ca-rich": 8, "Ibn": 9, "Type II": 10, "IIP": 11, "IIL": 12, "IIn": 13, "IIb": 14,
+    class_ids = {"Other": 0, "Supernova": 1, "Type I": 2, "Ia": 3, "Ia-norm": 3, "Ib": 4, "Ib-norm": 3, "Ic": 5, "Ic-norm": 3, "Ib/c": 6, "Ic-BL": 7, "Ib-Ca-rich": 8, "Ibn": 9, "Type II": 10, "II-norm": 10, "IIP": 11, "IIL": 12, "IIn": 13, "IIb": 14,
         "I-faint": 15, "I-rapid": 16, "SLSN-I": 18, "SLSN-II": 19, "SLSN-R": 20, "Afterglow": 23, "LBV": 24, "ILRT": 25, "Novae": 26, "Cataclysmic": 27, "Stellar variable": 28, "AGN": 29, "Galactic nuclei": 30, "QSO": 31, "Light-Echo": 40,
         "Std-spec": 50, "Gap": 60, "Gap I": 61, "Gap II": 62, "LRN": 65, "FBOT": 66, "kilonova": 70, "Impostor-SN": 99, "Ia-pec": 100, "Ia-SC": 102, "Ia-91bg": 103, "Ia-91T": 104, "Ia-02cx": 105,
         "Ia-CSM": 106, "Ib-pec": 107, "Ic-pec": 108, "Icn": 109, "Ibn/Icn": 110, "II-pec": 111, "IIn-pec": 112, "Tidal Disruption Event": 120, "FRB": 130, "Wolf-Rayet": 200, "WR-WN": 201, "WR-WC": 202, "WR-WO": 203, "M dwarf": 210,
@@ -1031,6 +1047,8 @@ def sourceclassification(outfile, dat=str(datetime.date.today() - datetime.timed
     path = 'https://fritz.science/api/sources?group_ids=41&saveSummary=true&savedAfter='+dat+'T00:00:00.000001'
 
     response = api('GET',path)
+
+    #print('data received')
 
     srcs = []
     dates = []
