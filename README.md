@@ -40,7 +40,7 @@ In most cases, you will want to look for newly classified or saved transients fr
 
 ### Redshift Determination for Classified Sources
 
-The script will first search for sources saved since the inputted date that are classified but do not have redshifts in Fritz. If any exist, the user can proceed to run SNID on these sources to determine redshift. If the source has a spectrum on Fritz, the user will be prompted to enter in a spectrum to use in SNID. The Fritz page will open in your browser. Some helpful things to check are:
+The script can search for sources saved since the inputted date that are classified but do not have redshifts in Fritz. If any exist, the user can proceed to run SNID on these sources to determine redshift. If the source has a spectrum on Fritz, the user will be prompted to enter in a spectrum to use in SNID. The Fritz page will open in your browser. Some helpful things to check are:
 
 * **The spectra themselves**: check the dates of the uploaded spectra, typically a classification will occur a day or so after the spectrum was uploaded. If there are duplicate uploaded spectra, it does not matter. Generally, the "constep" spectra have lower SNR and were used for classification. If there is none in this time frame, check below.
 * **Classifications**: Since these sources have classifications, check the date they were classified, and choose the spectrum that led to classification.
@@ -50,20 +50,20 @@ Once the correct spectrum is uploaded, SNID will run on the uploaded spectrum, a
 
 ### SNID Analysis on Unclassified Sources
 
-After completing this, the script will select all unclassified sources that have been saved since the inputted date. The user can proceed to run SNID on unclassified transients, the process of which is the same as with the redshifts. Select the spectrum to use carefully using the following critera:
+The script can select all unclassified sources that have been saved since the inputted date to run classification. The user can proceed to run SNID on unclassified transients, the process of which is the same as with the redshifts. Select the spectrum to use carefully using the following critera:
 
 * **The spectra themselves**: check the plots on Fritz. Generally, SEDM spectra which were taken most recently will have lower SNR, and "constep" spectra will generally also have lower SNR than "robot" spectra. If there are spectra from more powerful telescopes than SEDM (such as LRIS or NOT), use these.
 * **Comments**: Check comments for information on the source, sometimes there will be discussion on several potential classifications. If this is the case, SNID will likely not converge with a high `rlap` on any specific template.
 
-The spectral flux data will be downloaded from Fritz as an ASCII fileand saved in `/data` (this directory will be generated if it does not exist). SNID will then run on the downloaded spectrum and pull this spectrum from the folder. If SNID converges, the script will open up ten plots, those with the highest `rlap` score. Check the rlap score of the first few, if they are greater than 10 and all converge on the same classification, then consider submitting a classification to Fritz. Check the plots to ensure that the spectrum closely matches that of the templates. If ever in doubt, **do not submit a classification**, further observing runs can provide better spectra.
+The spectral flux data will be downloaded from Fritz as an ASCII fileand saved in `/data` (this directory will be generated if it does not exist). SNID will then run on the downloaded spectrum and pull this spectrum from the folder. If SNID converges, the script will open up ten plots, those with the highest `rlap` score. Check the rlap score of the first few, if they are greater than 10 and all converge on the same classification, then consider submitting a classification to Fritz. Check the plots to ensure that the spectrum closely matches that of the templates. The code will also run fitting on the light curve using `sncosmo`. This will pull the photometry data from Fritz and attempt to fit it to an SN Ia light curve. This is helpful if there is a <10 rlap score or noisy spectrum, but many templates that fit an SN Ia. The fit parameters converged on by `sncosmo` and many standard deviations they are from a sample of ~500 Fritz supernovae will also be displayed. If ever in doubt, **do not submit a classification**, further observing runs can provide better spectra.
 
-The results of SNID will be saved in `/outfiles/<ZTFname>` (this directory also will be generated if it does not exist). These include the `.output` file, which includes the converged templates and their `rlap` scores, plus the redshift and redshift error from the fit of that spectrum. The spectral flux data of the ten templates will also be saved, along with plots of their spectra plotted over the source spectrum.
+The results of SNID will be saved in `/outfiles/<ZTFname>` (this directory also will be generated if it does not exist). These include the `.output` file, which includes the converged templates and their `rlap` scores, plus the redshift and redshift error from the fit of that spectrum. The spectral flux data of the ten templates will also be saved, along with plots of their spectra plotted over the source spectrum. The light curve fit will also be saved as an image.
 
 Again, at the end of the source list the user will be prompted to upload the classifications to Fritz. It will also upload redshifts for the transients if they are not already on Fritz, but will not overwrite if it does already have them. The API responses for each upload will again be returned. In the case that a SNID classification is not an option in Fritz, it will return a failure code, but in this situation just ignore the source and move on. The successfully uploaded classifications and redshifts will be updated in the source ASCII file, so it does not need to be downloaded again to include the updated classifications.
 
 ### TNS Submission
 
-The code will then move on to submit to TNS any classified transients that have not been previously submitted by ZTF.
+The script can also submit to TNS any classified transients that have not been previously submitted by ZTF.
 
 The code will run through the sources labeled as "classified" in the ASCII file. Some may not have spectra on Fritz, if this is the case then they were classified externally from publications or by other groups. If this is the case, there is no need to submit. However, if there is a spectrum, it will first check the comments to ensure a report has not already been submitted by ZTF. If it was, typically one of the comments will say "Uploaded to TNS" verbatim. If not, it will then check the transient's TNS page and see if there is a report from ZTF. If either of the two are found, it will move on to the next source.
 
@@ -75,10 +75,15 @@ After completing all in the list, the script will indicate that the submission p
 
 ## Plans
 
-- [ ] Include additional classification techniques using photometry.
-- [ ] Include RCF checking through the API and with photometry curves.
+- [x] Include additional classification techniques using photometry.
+- [ ] Include RCF checking through the API and with photometry curves. (This is being looked into but may be challenging as it takes significantly longer to do it through API.)
 
 ## Changelog
+
+### 2021-08-04
+
+- Added in light-curve fitting functionality.
+- Added in menu for selecting various options rather than running through successively.
 
 ### 2021-08-02
 
