@@ -220,6 +220,7 @@ def snid_analyze(source):
 
     plt.figure(i)
     sncosmo.plot_lc(data, model=fitted_model)
+    plt.savefig(os.getcwd()+'/outfiles/'+fname[:-6]+'/'+fname[:-6]+'_lc.png')
 
     plt.show()
 
