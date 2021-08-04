@@ -7,6 +7,7 @@ import os, glob2
 import numpy as np
 import pandas as pd
 import pickle
+import pytz
 import re
 import requests, json
 import sys, getopt, argparse
@@ -54,40 +55,48 @@ f = ascii.read("RCF_sources.ascii") #ascii file containing the names of sources 
 entered = input('Enter in the earliest date you want to check classifications or saves (YYYY-MM-DD) or \'y\' for yesterday at midnight: ')
 
 if entered == 'Y' or entered == 'y':
-    startd = datetime.datetime.combine((datetime.date.today() - datetime.timedelta(days=1)), datetime.datetime.min.time())
+    startd = datetime.datetime.combine((datetime.datetime.utcnow().date() - datetime.timedelta(days=1)), datetime.datetime.min.time()).replace(tzinfo=datetime.timezone.utc)
 else:
-    startd = datetime.datetime.strptime(entered, '%Y-%m-%d')
+    startd = datetime.datetime.strptime(entered, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
 
 sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Parses data from ASCII file according to previous input
 
-print(bcolors.OKGREEN + 'Checking for missing redshifts...' + bcolors.ENDC)
+option = ''
+while option != 0: # Select options
+    print('1: Check for missing redshifts\n2: Classify unclassified sources\n3: Submit Fritz classifications to TNS')
+    option = int(input('Enter in what you want to do, 0 to exit, or "all" to do all: '))
 
-if len(reds[reds=='No redshift found']) == 0:
-    print('All classified sources have listed redshifts.')
-else:
-    red_resp = input(str(len(reds[reds=='No redshift found'])) + ' classified sources have no redshift listed. Use SNID to determine? [y/n] ')
+    if option == 1 or option == 'all':
 
-    if red_resp == 'y':
-        submit_reds(sources[reds=='No redshift found'])
+        print(bcolors.OKGREEN + 'Checking for missing redshifts...' + bcolors.ENDC)
 
-        sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Reload RCF source file with transients with newly determined redshifts
+        if len(reds[reds=='No redshift found']) == 0:
+            print('All classified sources have listed redshifts.')
+        else:
+            print(str(len(reds[reds=='No redshift found'])) + ' classified sources have no redshift listed.')
 
-print(bcolors.OKGREEN + 'Checking for unclassified transients...' + bcolors.ENDC)
+            submit_reds(sources[reds=='No redshift found'], f)
 
-if len(unclassifys) == 0:
-    print('There are no unclassified sources since the date entered.')
-else:
-    c = input(str(len(unclassifys)) + ' unclassified transients on Fritz have been saved. Would you like to classify them? [y/n] ')
+            sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Reload RCF source file with transients with newly determined redshifts
 
-    if c == 'y':
-        submit_class(sources)
+    if option == 2 or option == 'all':
 
-        sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Reload RCF source file with newly classified transients
+        print(bcolors.OKGREEN + 'Checking for unclassified transients...' + bcolors.ENDC)
 
-print(bcolors.OKGREEN + 'Beginning TNS submissions...' + bcolors.ENDC)
+        if len(unclassifys) == 0:
+            print('There are no unclassified sources since the date entered.')
+        else:
+            print(str(len(unclassifys)) + ' unclassified transients on Fritz have been saved. Would you like to classify them? [y/n] ')
 
-print('There are ' + str(len(sources)) + ' objects saved or classified later than ' + str(startd) + ' with classifications.')
+            submit_class(unclassifys, f)
 
-class_submission(sources, tns_names, classifys, class_dates) # Runs TNS submission script
+            sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Reload RCF source file with newly classified transients
+
+    if option == 3 or option == 'all':
+        print(bcolors.OKGREEN + 'Beginning TNS submissions...' + bcolors.ENDC)
+
+        print('There are ' + str(len(sources)) + ' objects saved or classified later than ' + str(startd) + ' with classifications.')
+
+        class_submission(sources, tns_names, classifys, class_dates) # Runs TNS submission script
 
 print('Submission complete. Goodbye!')

@@ -7,6 +7,7 @@ import os, glob2
 import numpy as np
 import pandas as pd
 import pickle
+import pytz
 import re
 import requests, json
 import sys, getopt, argparse
@@ -140,7 +141,7 @@ class TNSClassificationReport:
 
         return json.dumps(self.fill())
 
-def api(method, endpoint, data=None, params=None):
+def api(method, endpoint, data=None, params=None, timeout=3):
     ''' Info : Basic API query, takes input the method (eg. GET, POST, etc.), the endpoint (i.e. API url)
                and additional data for filtering
         Returns : response in json format
@@ -152,7 +153,7 @@ def api(method, endpoint, data=None, params=None):
 
     while True:
         try:
-            response = requests.request(method, endpoint, json=data, headers=headers, params=params, timeout=3)
+            response = requests.request(method, endpoint, json=data, headers=headers, params=params, timeout=timeout)
         except requests.exceptions.Timeout:
             continue
 
@@ -956,7 +957,7 @@ def get_pprint(item, indent=0, tab=' '*4, maxwidth=float('inf')):
 
     return result
 
-def get_redshift(ztfname):
+def get_redshift(ztfname, return_err=False):
 
     ''' Info : Query the redshift for any source
         Input : ZTFname
@@ -967,11 +968,17 @@ def get_redshift(ztfname):
     response = api('GET',url)
 
     redshift = response['data']['redshift']
+    redshift_err = response['data']['redshift_error']
 
     if (redshift == None):
         redshift = "No redshift found"
+    if redshift_err == None:
+        redshift_err = 'No redshift error found'
 
-    return redshift
+    if return_err == False:
+        return redshift
+    else:
+        return redshift, redshift_err
 
 def get_required_spectrum_id(ztfname, auto=False):
 
@@ -1187,6 +1194,11 @@ def get_total_number_of_sources(group_id):
     url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id
     response = api('GET',url)
     return len(response['data']['sources'])
+
+def get_user(fritz_id):
+    resp = api('GET', BASEURL+'api/user/'+str(fritz_id))
+
+    return resp['data']['username']
 
 def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
 
@@ -1417,19 +1429,19 @@ def read_ascii(f, startd):
     unclassifys = np.array([])
 
     for i in np.arange(0,len(sources_r)):
-            if classifys_r[i] != 'Not Classified' and (datetime.datetime.strptime(class_dates_r[i], '%Y-%m-%d') > startd or datetime.datetime.strptime(savedates_r[i], '%Y-%m-%d') > startd):
-                sources = np.append(sources, sources_r[i])
-                tns_names = np.append(tns_names, tns_names_r[i])
-                savedates = np.append(savedates, savedates_r[i])
-                classifys = np.append(classifys, classifys_r[i])
-                class_dates = np.append(class_dates, class_dates_r[i])
-                reds = np.append(reds, str(reds_r[i]))
-            if classifys_r[i] == 'Not Classified' and datetime.datetime.strptime(savedates_r[i], '%Y-%m-%d') > startd:
-                unclassifys = np.append(unclassifys, sources_r[i])
+        if classifys_r[i] != 'Not Classified' and (datetime.datetime.strptime(class_dates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd or datetime.datetime.strptime(savedates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd):
+            sources = np.append(sources, sources_r[i])
+            tns_names = np.append(tns_names, tns_names_r[i])
+            savedates = np.append(savedates, savedates_r[i])
+            classifys = np.append(classifys, classifys_r[i])
+            class_dates = np.append(class_dates, class_dates_r[i])
+            reds = np.append(reds, str(reds_r[i]))
+        if classifys_r[i] == 'Not Classified' and datetime.datetime.strptime(savedates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd:
+            unclassifys = np.append(unclassifys, sources_r[i])
 
     return sources, tns_names, savedates, classifys, class_dates, reds, unclassifys
 
-def sourceclassification(outfile, dat=str(datetime.date.today() - datetime.timedelta(days=180))):
+def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - datetime.timedelta(days=180))):
 
     ''' Info : Downloads list of transients on Fritz saved after specified date (or since 180 days prior if no input)
                Saves ZTF names, TNS names, dates saved, classifications, classifications, redshifts as ASCII file
@@ -1437,7 +1449,7 @@ def sourceclassification(outfile, dat=str(datetime.date.today() - datetime.timed
         Returns : None
     '''
 
-    path = 'https://fritz.science/api/sources?group_ids=41&saveSummary=true&savedAfter='+dat+'T00:00:00.000001'
+    path = 'https://fritz.science/api/sources?group_ids=41&saveSummary=true&savedAfter='+str(dat)+'T00:00:00.000001'
 
     response = api('GET',path)
 

@@ -3,15 +3,119 @@ import numpy as np
 import os
 import shlex
 import shutil
+import sncosmo
 import subprocess
 import sys
 import time
 
 from astropy.io import ascii
+from astropy.table import QTable
 from func import *
+
+# These numbers come from running model fits on ~500 Type Ia supernovae
+z = 0.060574239946858476
+z_std = 0.023994157056121096
+x0 = -0.14238796934437334
+x0_std = 1.4557579021314682
+c = 0.08928354223298558
+c_std = 0.15670291093588692
+x1 = 0.0007648532623426458
+x1_std = 0.0004363803462578883
 
 with open('info.info', 'r') as f:
     SNID_loc = f.read().split('\n')[0].split(':')[1].strip()
+
+def get_photometry(ztfname, format='flux'):
+
+    ''' Info : Retrieves photometry data for a source from Fritz and filters out Nonetype points
+        Input : Source name and brightness format ("flux" or "mag")
+        Returns : Astropy QTable with data that feeds into sncosmo.fit_lc
+    '''
+
+    url = BASEURL+'api/sources/'+ztfname+'/photometry' # Access photometry
+
+    if format == 'flux':
+        data = {"format": "flux"}
+    elif format == 'mag':
+        data = {'format': 'mag'}
+
+    response = api('GET', url, params=data, timeout=10)
+
+    if format == 'flux':
+
+        flux = []
+        fluxerr = []
+        band = []
+        mjd = []
+        zpsys = []
+        zp = []
+
+        for d in response['data']:
+            if d['flux'] != None and (d['filter'] == 'ztfg' or d['filter'] == 'ztfr'):
+                flux.append(d['flux'])
+                fluxerr.append(d['fluxerr'])
+                band.append(d['filter'])
+                mjd.append(d['mjd'])
+                zpsys.append(d['magsys'])
+                zp.append(d['zp'])
+
+        return QTable([mjd, band, flux, fluxerr, zp, zpsys], names=('mjd', 'filter', 'flux','fluxerr', 'zp', 'zpsys'))
+
+    elif format == 'mag':
+
+        mag = []
+        magerr = []
+        band = []
+        mjd = []
+        zpsys = []
+
+        for d in response['data']:
+            if d['mag'] != None and (d['filter'] == 'ztfg' or d['filter'] == 'ztfr'):
+                mag.append(d['mag'])
+                magerr.append(d['magerr'])
+                band.append(d['filter'])
+                mjd.append(d['mjd'])
+                zpsys.append(d['magsys'])
+
+        return QTable([mjd, band, mag, magerr, zpsys], names=('mjd', 'filter', 'mag','magerr', 'zpsys'))
+
+def model_lc(source):
+
+    ''' Info : Fits photometry data to light curve using sncosmo.
+        Input : source
+        Returns : photometry data, fitted parameters, plottable model
+    '''
+
+    data = get_photometry(source)
+
+    with open('test_table.txt', 'w') as f:
+        f.write(str(data))
+
+    red, red_err = get_redshift(source, True)
+    model = sncosmo.Model(source='salt2')
+
+    if red != 'No redshift found':
+
+        if red_err != 'No redshift error found': # If both redshift and error present, use error as bounds to fit redshift
+            result, fitted_model = sncosmo.fit_lc(
+                data, model,
+                ['z', 't0', 'x0', 'x1', 'c'],  # parameters of model to vary
+                bounds={'z':(red-red_err, red+red_err)}, minsnr=5)  # bounds on parameters (if any)
+        else: # If no redshift error, don't determine redshift
+            model.set(z=red)
+
+            result, fitted_model = sncosmo.fit_lc(
+                data, model,
+                ['t0', 'x0', 'x1', 'c'],
+                guess_z=False, minsnr=5)
+
+    else:
+        result, fitted_model = sncosmo.fit_lc(
+            data, model,
+            ['z', 't0', 'x0', 'x1', 'c'],
+            bounds={'z':(0,0.3)}, minsnr=5)
+
+    return data, result, fitted_model
 
 def snid_analyze(source):
 
@@ -100,6 +204,23 @@ def snid_analyze(source):
                 i += 1
             # SNID generates files in the working directory, so move the files to the created directory
             shutil.move(item, os.getcwd()+'/outfiles/'+fname[:-6])
+
+    data, result, fitted_model = model_lc(source) # Run light curve fitting on data
+
+    if len(result.parameters) == 5:
+        print('Fitted z is ' + str(np.round((result.parameters[0]-z)/z_std, 1)) + ' standard deviations from mean')
+        print('Fitted x0 is ' + str(np.round((result.parameters[2]-x0)/x0_std, 1)) + ' standard deviations from mean')
+        print('Fitted x1 is ' + str(np.round((result.parameters[3]-x1)/x1_std, 1)) + ' standard deviations from mean')
+        print('Fitted c is ' + str(np.round((result.parameters[4]-c)/c_std, 1)) + ' standard deviations from mean')
+    elif len(result.parameters) == 4:
+        print('Fitted x0 is ' + str(np.round((result.parameters[1]-x0)/x0_std, 1)) + ' standard deviations from mean')
+        print('Fitted x1 is ' + str(np.round((result.parameters[2]-x1)/x1_std, 1)) + ' standard deviations from mean')
+        print('Fitted c is ' + str(np.round((result.parameters[3]-c)/c_std, 1)) + ' standard deviations from mean')
+
+
+    plt.figure(i)
+    sncosmo.plot_lc(data, model=fitted_model)
+
     plt.show()
 
     save = input('Save classification for source? [y/n] ')
@@ -123,7 +244,7 @@ def snid_analyze(source):
 
     return typ[np.argmax(frac)], frac[np.argmax(frac)], red[np.argmax(frac)], red_err[np.argmax(frac)]
 
-def submit_reds(no_reds):
+def submit_reds(no_reds, f):
 
     ''' Info : Submits redshift information to Fritz
         Input : list of sources with classifications and no redshift
@@ -147,12 +268,13 @@ def submit_reds(no_reds):
                     print(bcolors.OKGREEN + transients_r[tr] + 'classification upload successful.' + bcolors.ENDC)
                 else:
                     print(bcolors.FAIL + transients_r[tr] + 'classification upload failed.' + bcolors.ENDC)
+                    print(bcolors.FAIL + fritz_redshift['message'] + bcolors.ENDC)
 
                 f['redshift'][np.argwhere(f['Source Name'] == transients_r[tr])] = reds_r[tr]
 
             f.write('RCF_sources.ascii', format='ascii', overwrite=True, delimiter='\t')
 
-def submit_class(unclassifys):
+def submit_class(unclassifys, f):
 
     ''' Info : Submits classification information to Fritz
         Input : list of sources without classifications
@@ -172,13 +294,14 @@ def submit_class(unclassifys):
             for tr in np.arange(0,len(transients)):
                 check_r = get_redshift(transients[tr])
 
-                if check_r != 'No redshift found':
+                if check_r == 'No redshift found':
                     fritz_redshift = submit_fritz_redshift(transients[tr], reds[tr], red_errs[tr])
 
                     if fritz_redshift['status'] == 'success':
                         print(bcolors.OKGREEN + transients[tr] + ' redshift upload successful.' + bcolors.ENDC)
                     else:
                         print(bcolors.FAIL + transients[tr] + ' redshift upload failed.' + bcolors.ENDC)
+                        print(bcolors.FAIL + fritz_redshift['message'] + bcolors.ENDC)
 
                     f['redshift'][np.argwhere(f['Source Name'] == transients[tr])] = reds[tr]
 
@@ -188,10 +311,11 @@ def submit_class(unclassifys):
                     print(bcolors.OKGREEN + transients[tr] + ' classification upload successful.' + bcolors.ENDC)
                 else:
                     print(bcolors.FAIL + transients[tr] + ' classification upload failed.' + bcolors.ENDC)
+                    print(bcolors.FAIL + fritz_class['message'] + bcolors.ENDC)
 
                 # Updates RCF source ASCII if user classified any transients
                 f['Classification'][np.argwhere(f['Source Name'] == transients[tr])] = types[tr]
-                f['Classification Date'][np.argwhere(f['Source Name'] == transients[tr])] = str(datetime.date.today())
+                f['Classification Date'][np.argwhere(f['Source Name'] == transients[tr])] = str(datetime.datetime.utcnow().date())
 
             f.write('RCF_sources.ascii', format='ascii', overwrite=True, delimiter='\t')
 
@@ -241,6 +365,8 @@ def run_class(unclassifys):
                 t = 'Type II'
             elif t == 'Gal':
                 t = 'Galactic Nuclei'
+            elif t == 'Ia-csm':
+                t = 'Ia-CSM'
             transients.append(unclassifys[s])
             types.append(t)
             rlaps.append(f)
