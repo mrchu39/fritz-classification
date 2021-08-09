@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import astropy.units as u
+import base64
 import datetime
 import json
 import os, glob2
@@ -154,13 +155,19 @@ def api(method, endpoint, data=None, params=None, timeout=3):
     while True:
         try:
             response = requests.request(method, endpoint, json=data, headers=headers, params=params, timeout=timeout)
+            re_dict = response.json()
+
+            if '429 Too Many Requests' not in response.text:
+                return re_dict
+            else:
+                #print('429')
+                continue
         except requests.exceptions.Timeout:
+            #print('Timeout Exception, restarting...')
             continue
-
-        if '429 Too Many Requests' not in response.text:
-            break
-
-    return response.json()
+        except json.decoder.JSONDecodeError:
+            #print('JSON Decode Error, restarting...')
+            continue
 
 def APO(specid):
 
@@ -1049,7 +1056,7 @@ def get_source_api(ztfname):
                   includes redshift, classification, comments, etc.)
     '''
     url = BASEURL+'api/sources/'+ztfname+'?includeComments=true'
-    response = api('GET',url)
+    response = api('GET',url, timeout=None)
     return response['data']
 
 def get_source_file(outfile, since):
@@ -1098,7 +1105,7 @@ def get_TNS_classification_ID(classification):
     '''
 
     class_ids = {"Other": 0, "Supernova": 1, "Type I": 2, "Ia": 3, "Ia-norm": 3, "Ib": 4, "Ib-norm": 3, "Ic": 5, "Ic-norm": 3, "Ib/c": 6, "Ic-BL": 7, "Ib-Ca-rich": 8, "Ibn": 9, "Type II": 10, "II-norm": 10, "IIP": 11, "IIL": 12, "IIn": 13, "IIb": 14,
-        "I-faint": 15, "I-rapid": 16, "SLSN-I": 18, "SLSN-II": 19, "SLSN-R": 20, "Afterglow": 23, "LBV": 24, "ILRT": 25, "Novae": 26, "Cataclysmic": 27, "Stellar variable": 28, "AGN": 29, "Galactic nuclei": 30, "QSO": 31, "Light-Echo": 40,
+        "I-faint": 15, "I-rapid": 16, "SLSN-I": 18, 'Ic-SLSN': 18, "SLSN-II": 19, "SLSN-R": 20, "Afterglow": 23, "LBV": 24, "ILRT": 25, "Novae": 26, "Cataclysmic": 27, "Stellar variable": 28, "AGN": 29, "Galactic nuclei": 30, "QSO": 31, "Light-Echo": 40,
         "Std-spec": 50, "Gap": 60, "Gap I": 61, "Gap II": 62, "LRN": 65, "FBOT": 66, "kilonova": 70, "Impostor-SN": 99, "Ia-pec": 100, "Ia-SC": 102, "Ia-91bg": 103, "Ia-91T": 104, "Ia-02cx": 105,
         "Ia-CSM": 106, "Ib-pec": 107, "Ic-pec": 108, "Icn": 109, "Ibn/Icn": 110, "II-pec": 111, "IIn-pec": 112, "Tidal Disruption Event": 120, "FRB": 130, "Wolf-Rayet": 200, "WR-WN": 201, "WR-WC": 202, "WR-WO": 203, "M dwarf": 210,
         "Computed-Ia": 1003, "Computed-IIP": 1011, "Computed-IIb": 1014, "Computed-PISN": 1020, "Computed-IIn": 1021}
@@ -1379,7 +1386,7 @@ def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
 
     return spectrum_name, specid
 
-def post_comment(ztfname, text):
+def post_comment(ztfname, text, attach=None, attach_name=None):
 
     ''' Info : Posts a comment on transient's Fritz page
         Input : ZTFname, text
@@ -1390,9 +1397,40 @@ def post_comment(ztfname, text):
               "text": text,
            }
 
+    if attach != None:
+        with open(attach, "rb") as img_file:
+            at_str = base64.b64encode(img_file.read()).decode('utf-8')
+
+        data['attachment'] = {'body': at_str, 'name': attach_name}
+
     url = BASEURL+'api/comment'
 
     response = api('POST', url, data=data)
+
+    return response
+
+def edit_comment(ztfname, comment_id, author_id, text, attach=None, attach_name=None):
+
+    ''' Info : Posts a comment on transient's Fritz page
+        Input : ZTFname, text
+        Returns : API response
+    '''
+
+    data = {  "obj_id": ztfname,
+              "text": text,
+              'author_id': author_id
+           }
+
+    if attach != None:
+        with open(attach, "rb") as img_file:
+            at_str = base64.b64encode(img_file.read()).decode('utf-8')
+
+        data['attachment_name'] = attach_name
+        data['attachment_bytes'] = at_str
+
+    url = BASEURL+'api/comment'
+
+    response = api('PUT', url+'/'+str(comment_id)+'/object', data=data)
 
     return response
 

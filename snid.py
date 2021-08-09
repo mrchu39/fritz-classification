@@ -1,3 +1,4 @@
+import base64
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -15,12 +16,12 @@ from func import *
 # These numbers come from running model fits on ~500 Type Ia supernovae
 z = 0.060574239946858476
 z_std = 0.023994157056121096
-x0 = -0.14238796934437334
-x0_std = 1.4557579021314682
+x1 = -0.14238796934437334
+x1_std = 1.4557579021314682
 c = 0.08928354223298558
 c_std = 0.15670291093588692
-x1 = 0.0007648532623426458
-x1_std = 0.0004363803462578883
+x0 = 0.0007648532623426458
+x0_std = 0.0004363803462578883
 
 with open('info.info', 'r') as f:
     SNID_loc = f.read().split('\n')[0].split(':')[1].strip()
@@ -205,22 +206,25 @@ def snid_analyze(source):
             # SNID generates files in the working directory, so move the files to the created directory
             shutil.move(item, os.getcwd()+'/outfiles/'+fname[:-6])
 
-    data, result, fitted_model = model_lc(source) # Run light curve fitting on data
+    try:
+        data, result, fitted_model = model_lc(source) # Run light curve fitting on data
 
-    if len(result.parameters) == 5:
-        print('Fitted z is ' + str(np.round((result.parameters[0]-z)/z_std, 1)) + ' standard deviations from mean')
-        print('Fitted x0 is ' + str(np.round((result.parameters[2]-x0)/x0_std, 1)) + ' standard deviations from mean')
-        print('Fitted x1 is ' + str(np.round((result.parameters[3]-x1)/x1_std, 1)) + ' standard deviations from mean')
-        print('Fitted c is ' + str(np.round((result.parameters[4]-c)/c_std, 1)) + ' standard deviations from mean')
-    elif len(result.parameters) == 4:
-        print('Fitted x0 is ' + str(np.round((result.parameters[1]-x0)/x0_std, 1)) + ' standard deviations from mean')
-        print('Fitted x1 is ' + str(np.round((result.parameters[2]-x1)/x1_std, 1)) + ' standard deviations from mean')
-        print('Fitted c is ' + str(np.round((result.parameters[3]-c)/c_std, 1)) + ' standard deviations from mean')
+        if len(result.parameters) == 5:
+            print('Fitted z is ' + str(np.round((result.parameters[0]-z)/z_std, 1)) + ' standard deviations from mean')
+            print('Fitted x0 is ' + str(np.round((result.parameters[2]-x0)/x0_std, 1)) + ' standard deviations from mean')
+            print('Fitted x1 is ' + str(np.round((result.parameters[3]-x1)/x1_std, 1)) + ' standard deviations from mean')
+            print('Fitted c is ' + str(np.round((result.parameters[4]-c)/c_std, 1)) + ' standard deviations from mean')
+        elif len(result.parameters) == 4:
+            print('Fitted x0 is ' + str(np.round((result.parameters[1]-x0)/x0_std, 1)) + ' standard deviations from mean')
+            print('Fitted x1 is ' + str(np.round((result.parameters[2]-x1)/x1_std, 1)) + ' standard deviations from mean')
+            print('Fitted c is ' + str(np.round((result.parameters[3]-c)/c_std, 1)) + ' standard deviations from mean')
 
 
-    plt.figure(i)
-    sncosmo.plot_lc(data, model=fitted_model)
-    plt.savefig(os.getcwd()+'/outfiles/'+fname[:-6]+'/'+fname[:-6]+'_lc.png')
+        plt.figure(i)
+        sncosmo.plot_lc(data, model=fitted_model)
+        plt.savefig(os.getcwd()+'/outfiles/'+fname[:-6]+'/'+fname[:-6]+'_lc.png')
+    except RuntimeError:
+        pass
 
     plt.show()
 
@@ -384,3 +388,71 @@ def run_class(unclassifys):
             os.remove(os.path.join(os.getcwd()+'/data', item))
 
     return transients, types, rlaps, reds, red_errs
+
+def post_lc(source):
+    data = get_photometry(source)
+    comment_infos = get_source_api(source)['comments']
+
+    for i in range (len(get_source_api(source)['comments'])):
+
+        comment_info = comment_infos[i]
+        comment = comment_info['text']
+
+        if 'sncosmo light curve fit' in comment:
+            if int(comment[int(comment.index('n='))+2:].split(',')[0]) != len(data):
+
+                try:
+                    dfit, result, fitted_model = model_lc(source)
+                except RuntimeError:
+                    return
+
+                if len(result.parameters) == 5:
+                    x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
+                    c_nstds = np.round(np.abs((result.parameters[4]-c))/c_std, 1)
+                elif len(result.parameters) == 4:
+                    x1_nstds = np.round(np.abs((result.parameters[2]-x1))/x1_std, 1)
+                    c_nstds = np.round(np.abs((result.parameters[3]-c))/c_std, 1)
+
+                sncosmo.plot_lc(dfit, model=fitted_model)
+                plt.savefig('temp.png')
+
+                resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'sncosmo light curve fit n='+str(len(data))+', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds), 'temp.png', source+'_sncosmo_lc.png')
+
+                if resp['status'] == 'success':
+                    print(bcolors.OKGREEN + source + ' LC update successful.' + bcolors.ENDC)
+                else:
+                    print(bcolors.FAIL + source + ' LC update failed.' + bcolors.ENDC)
+                    print(bcolors.FAIL + resp['data'] + bcolors.ENDC)
+
+                plt.close('all')
+
+                return
+            else:
+                print(source + ' LC up to date.')
+                return
+
+    try:
+        dfit, result, fitted_model = model_lc(source)
+    except RuntimeError:
+        print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC)
+        return
+
+    if len(result.parameters) == 5:
+        x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
+        c_nstds = np.round(np.abs((result.parameters[4]-c)/c_std), 1)
+    elif len(result.parameters) == 4:
+        x1_nstds = np.round(np.abs((result.parameters[2]-x1)/x1_std), 1)
+        c_nstds = np.round(np.abs((result.parameters[3]-c)/c_std), 1)
+
+    sncosmo.plot_lc(dfit, model=fitted_model)
+    plt.savefig('temp.png')
+
+    resp = post_comment(source, 'sncosmo light curve fit n='+str(len(data))+', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds), 'temp.png', source+'_sncosmo_lc.png')
+
+    if resp['status'] == 'success':
+        print(bcolors.OKGREEN + source + ' LC upload successful.' + bcolors.ENDC)
+    else:
+        print(bcolors.FAIL + source + ' LC upload failed.' + bcolors.ENDC)
+        print(bcolors.FAIL + resp['data'] + bcolors.ENDC)
+
+    plt.close('all')

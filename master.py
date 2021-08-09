@@ -63,7 +63,7 @@ sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_
 
 option = ''
 while option != 0: # Select options
-    print('1: Check for missing redshifts\n2: Classify unclassified sources\n3: Submit Fritz classifications to TNS')
+    print('1: Check for missing redshifts\n2: Classify unclassified sources\n3: Check and upload light curve data\n4: Submit Fritz classifications to TNS')
     option = int(input('Enter in what you want to do, 0 to exit, or "all" to do all: '))
 
     if option == 1 or option == 'all':
@@ -93,6 +93,16 @@ while option != 0: # Select options
             sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Reload RCF source file with newly classified transients
 
     if option == 3 or option == 'all':
+
+        print(bcolors.OKGREEN + 'Checking for updated photometry data...' + bcolors.ENDC)
+
+        phot_sources = np.concatenate(([sources[s] for s in np.arange(0,len(sources)) if 'Ia' in classifys[s]], unclassifys))
+
+        for p in np.arange(0,len(phot_sources)):
+            print(bcolors.OKCYAN + str(p+1) + '/' + str(len(phot_sources)) + bcolors.ENDC + ': ' + bcolors.OKBLUE + phot_sources[p] + bcolors.ENDC)
+            post_lc(phot_sources[p])
+
+    if option == 4 or option == 'all':
         print(bcolors.OKGREEN + 'Beginning TNS submissions...' + bcolors.ENDC)
 
         print('There are ' + str(len(sources)) + ' objects saved or classified later than ' + str(startd) + ' with classifications.')
