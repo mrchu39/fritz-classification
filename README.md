@@ -83,7 +83,7 @@ After completing all in the list, the script will indicate that the submission p
 
 ### 2021-08-09
 
-- Fixed negative sigmas
+- Fixed negative sigmas.
 
 ### 2021-08-04
 
