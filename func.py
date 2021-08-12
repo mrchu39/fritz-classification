@@ -10,7 +10,7 @@ import pandas as pd
 import pickle
 import pytz
 import re
-import requests, json
+import requests, json, simplejson
 import sys, getopt, argparse
 import webbrowser as wb
 import xlsxwriter
@@ -142,7 +142,7 @@ class TNSClassificationReport:
 
         return json.dumps(self.fill())
 
-def api(method, endpoint, data=None, params=None, timeout=3):
+def api(method, endpoint, data=None, params=None, timeout=10):
     ''' Info : Basic API query, takes input the method (eg. GET, POST, etc.), the endpoint (i.e. API url)
                and additional data for filtering
         Returns : response in json format
@@ -163,9 +163,9 @@ def api(method, endpoint, data=None, params=None, timeout=3):
                 #print('429')
                 continue
         except requests.exceptions.Timeout:
-            #print('Timeout Exception, restarting...')
+            print('Timeout Exception, restarting...')
             continue
-        except json.decoder.JSONDecodeError:
+        except (json.decoder.JSONDecodeError, simplejson.errors.JSONDecodeError):
             #print('JSON Decode Error, restarting...')
             continue
 
@@ -1105,7 +1105,7 @@ def get_TNS_classification_ID(classification):
     '''
 
     class_ids = {"Other": 0, "Supernova": 1, "Type I": 2, "Ia": 3, "Ia-norm": 3, "Ib": 4, "Ib-norm": 3, "Ic": 5, "Ic-norm": 3, "Ib/c": 6, "Ic-BL": 7, "Ib-Ca-rich": 8, "Ibn": 9, "Type II": 10, "II-norm": 10, "IIP": 11, "IIL": 12, "IIn": 13, "IIb": 14,
-        "I-faint": 15, "I-rapid": 16, "SLSN-I": 18, 'Ic-SLSN': 18, "SLSN-II": 19, "SLSN-R": 20, "Afterglow": 23, "LBV": 24, "ILRT": 25, "Novae": 26, "Cataclysmic": 27, "Stellar variable": 28, "AGN": 29, "Galactic nuclei": 30, "QSO": 31, "Light-Echo": 40,
+        "I-faint": 15, "I-rapid": 16, "SLSN-I": 18, 'Ic-SLSN': 18, "SLSN-II": 19, "SLSN-R": 20, "Afterglow": 23, "LBV": 24, "ILRT": 25, "Novae": 26, "Cataclysmic": 27, "Stellar variable": 28, "AGN": 29, "Galactic Nuclei": 30, "QSO": 31, "Light-Echo": 40,
         "Std-spec": 50, "Gap": 60, "Gap I": 61, "Gap II": 62, "LRN": 65, "FBOT": 66, "kilonova": 70, "Impostor-SN": 99, "Ia-pec": 100, "Ia-SC": 102, "Ia-91bg": 103, "Ia-91T": 104, "Ia-02cx": 105,
         "Ia-CSM": 106, "Ib-pec": 107, "Ic-pec": 108, "Icn": 109, "Ibn/Icn": 110, "II-pec": 111, "IIn-pec": 112, "Tidal Disruption Event": 120, "FRB": 130, "Wolf-Rayet": 200, "WR-WN": 201, "WR-WC": 202, "WR-WO": 203, "M dwarf": 210,
         "Computed-Ia": 1003, "Computed-IIP": 1011, "Computed-IIb": 1014, "Computed-PISN": 1020, "Computed-IIn": 1021}

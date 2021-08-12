@@ -7,6 +7,7 @@ This tool pulls data from Fritz, uses SNID to classify transients, and uploads c
 * [astropy](https://www.astropy.org/)
 * [pandas](https://pandas.pydata.org/)
 * [SNID](https://people.lam.fr/blondin.stephane/software/snid/index.html)
+* [sncosmo](https://sncosmo.readthedocs.io/en/stable/install.html)
 
 ## Installation
 
@@ -20,7 +21,7 @@ You will also need the ID and API key for the bot that submits information to TN
 
 This script should be run about daily. Run `python master.py` in terminal.
 
-### Data Download
+### 0. Data Download
 
 The script will prompt the user to download an ASCII file containing a list of sources saved since the inputted date:
 
@@ -38,7 +39,7 @@ Enter in the earliest date you want to check classifications or saves (YYYY-MM-D
 
 In most cases, you will want to look for newly classified or saved transients from the previous day, so entering `y` is generally acceptable (if more than one day since last running, such as Monday, enter in the date of last use). If for whatever reason you want to look at objects saved earlier, you can enter in this date in the appropriate format.
 
-### Redshift Determination for Classified Sources
+### 1. Redshift Determination for Classified Sources
 
 The script can search for sources saved since the inputted date that are classified but do not have redshifts in Fritz. If any exist, the user can proceed to run SNID on these sources to determine redshift. If the source has a spectrum on Fritz, the user will be prompted to enter in a spectrum to use in SNID. The Fritz page will open in your browser. Some helpful things to check are:
 
@@ -48,7 +49,7 @@ The script can search for sources saved since the inputted date that are classif
 
 Once the correct spectrum is uploaded, SNID will run on the uploaded spectrum, at which point it will either converge on certain SN types or not. If it does not converge, the code will move on to the next source. If it does, it will output the ten templates with the highest `rlap` score. Of these, check the top few and identify if they match with the Fritz classification, and if they do, enter `y` when prompted by the code to save. After running through all sources that are classified without redshifts, the code will ask whether you want to upload the ones you saved to Fritz. If you upload, the code will output the API response to verify whether or not they have successfully been uploaded to Fritz.
 
-### SNID Analysis on Unclassified Sources
+### 2. SNID Analysis on Unclassified Sources
 
 The script can select all unclassified sources that have been saved since the inputted date to run classification. The user can proceed to run SNID on unclassified transients, the process of which is the same as with the redshifts. Select the spectrum to use carefully using the following critera:
 
@@ -61,7 +62,15 @@ The results of SNID will be saved in `/outfiles/<ZTFname>` (this directory also 
 
 Again, at the end of the source list the user will be prompted to upload the classifications to Fritz. It will also upload redshifts for the transients if they are not already on Fritz, but will not overwrite if it does already have them. The API responses for each upload will again be returned. In the case that a SNID classification is not an option in Fritz, it will return a failure code, but in this situation just ignore the source and move on. The successfully uploaded classifications and redshifts will be updated in the source ASCII file, so it does not need to be downloaded again to include the updated classifications.
 
-### TNS Submission
+### 3. Light Curve Submission
+
+Users can choose to fit light curves to transients' photometry for unclassified transients saved since the user's inputted date or Type Ia saved/classified since said date. This will pull photometry for each of the transients from Fritz. For those with less than five unique nights of photometry, a plot of the fitted light curve will appear and the user can observe it and determine whether it is meaningful enough to be uploaded to Fritz.
+
+The rest will automatically be uploaded or, if there is already a light curve comment, updated if new photometry has changed the fit.
+
+See also [link will be put here shortly] for individual LC fitting.
+
+### 4. TNS Submission
 
 The script can also submit to TNS any classified transients that have not been previously submitted by ZTF.
 
@@ -80,6 +89,11 @@ After completing all in the list, the script will indicate that the submission p
 - [ ] Assigning SEDM follow-ups for noisy data or as addition with RCF checking.
 
 ## Changelog
+
+### 2021-08-11
+
+- Added in a check that more than 5 days of photometry exists.
+- Calculates peak absolute magnitude using SALT2 parameters and comments on Fritz.
 
 ### 2021-08-09
 

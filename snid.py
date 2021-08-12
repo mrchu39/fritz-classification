@@ -26,6 +26,20 @@ x0_std = 0.0004363803462578883
 with open('info.info', 'r') as f:
     SNID_loc = f.read().split('\n')[0].split(':')[1].strip()
 
+def get_peak_absmag(z, x0):
+
+    ''' Info : Calcultes peak absolute magnitude with SALT2 model parameters
+        Input : SALT2-determined redshift and x0
+        Returns : Peak absolute magnitude
+    '''
+
+    peak_mag = -2.5*np.log10(x0) + 10.635
+    cosmo = FlatLambdaCDM(H0=70,Om0=0.3)
+    mu = cosmo.distmod(z).value
+    absmag = peak_mag -mu
+
+    return absmag
+
 def get_photometry(ztfname, format='flux'):
 
     ''' Info : Retrieves photometry data for a source from Fritz and filters out Nonetype points
@@ -88,9 +102,6 @@ def model_lc(source):
     '''
 
     data = get_photometry(source)
-
-    with open('test_table.txt', 'w') as f:
-        f.write(str(data))
 
     red, red_err = get_redshift(source, True)
     model = sncosmo.Model(source='salt2')
@@ -209,16 +220,10 @@ def snid_analyze(source):
     try:
         data, result, fitted_model = model_lc(source) # Run light curve fitting on data
 
-        if len(result.parameters) == 5:
-            print('Fitted z is ' + str(np.round((result.parameters[0]-z)/z_std, 1)) + ' standard deviations from mean')
-            print('Fitted x0 is ' + str(np.round((result.parameters[2]-x0)/x0_std, 1)) + ' standard deviations from mean')
-            print('Fitted x1 is ' + str(np.round((result.parameters[3]-x1)/x1_std, 1)) + ' standard deviations from mean')
-            print('Fitted c is ' + str(np.round((result.parameters[4]-c)/c_std, 1)) + ' standard deviations from mean')
-        elif len(result.parameters) == 4:
-            print('Fitted x0 is ' + str(np.round((result.parameters[1]-x0)/x0_std, 1)) + ' standard deviations from mean')
-            print('Fitted x1 is ' + str(np.round((result.parameters[2]-x1)/x1_std, 1)) + ' standard deviations from mean')
-            print('Fitted c is ' + str(np.round((result.parameters[3]-c)/c_std, 1)) + ' standard deviations from mean')
-
+        print('Fitted z is ' + str(np.round((result.parameters[0]-z)/z_std, 1)) + ' standard deviations from mean')
+        print('Fitted x0 is ' + str(np.round((result.parameters[2]-x0)/x0_std, 1)) + ' standard deviations from mean')
+        print('Fitted x1 is ' + str(np.round((result.parameters[3]-x1)/x1_std, 1)) + ' standard deviations from mean')
+        print('Fitted c is ' + str(np.round((result.parameters[4]-c)/c_std, 1)) + ' standard deviations from mean')
 
         plt.figure(i)
         sncosmo.plot_lc(data, model=fitted_model)
@@ -390,7 +395,14 @@ def run_class(unclassifys):
     return transients, types, rlaps, reds, red_errs
 
 def post_lc(source):
+
+    ''' Info : Posts LC data on Fritz as comment, along with nsigma for c and x1 and peak absolute magnitude. Plot is also attached.
+        Input : ZTFname
+        Returns : None
+    '''
+
     data = get_photometry(source)
+
     comment_infos = get_source_api(source)['comments']
 
     for i in range (len(get_source_api(source)['comments'])):
@@ -398,25 +410,37 @@ def post_lc(source):
         comment_info = comment_infos[i]
         comment = comment_info['text']
 
+        # Check if LC is already posted
         if 'sncosmo light curve fit' in comment:
-            if int(comment[int(comment.index('n='))+2:].split(',')[0]) != len(data):
+            if int(comment[int(comment.index('n='))+2:].split(',')[0]) != len(data) or 'x1_nstds' not in comment or 'c_nstds' not in comment or 'M_peak' not in comment: # Check if new photometry has been uploaded
 
                 try:
                     dfit, result, fitted_model = model_lc(source)
                 except RuntimeError:
+                    print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC) # Did not converge on fit
                     return
 
-                if len(result.parameters) == 5:
-                    x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
-                    c_nstds = np.round(np.abs((result.parameters[4]-c))/c_std, 1)
-                elif len(result.parameters) == 4:
-                    x1_nstds = np.round(np.abs((result.parameters[2]-x1))/x1_std, 1)
-                    c_nstds = np.round(np.abs((result.parameters[3]-c))/c_std, 1)
+                x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
+                c_nstds = np.round(np.abs((result.parameters[4]-c))/c_std, 1)
 
                 sncosmo.plot_lc(dfit, model=fitted_model)
+
+                if np.max(dfit['mjd']) - np.min(dfit['mjd']) < 5: # If <5 nights of photometry, check if user wants to upload
+                    plt.show(block=False)
+
+                    res = input('There are only ' + str(np.round(np.max(dfit['mjd']) - np.min(dfit['mjd']), 1)) + ' days worth of photometry data. Do you still want to proceed? [y/n] ')
+
+                    if res != 'y':
+                        plt.close()
+                        return
+
+                    plt.close()
+
                 plt.savefig('temp.png')
 
-                resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'sncosmo light curve fit n='+str(len(data))+', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds), 'temp.png', source+'_sncosmo_lc.png')
+                # If comment exists but new photometry uploaded, edit comment
+                resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'sncosmo light curve fit n='+str(len(data))+', M_peak = '+str(np.round(get_peak_absmag(result.parameters[0], result.parameters[2]),1))+
+                    ', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds), 'temp.png', source+'_sncosmo_lc.png')
 
                 if resp['status'] == 'success':
                     print(bcolors.OKGREEN + source + ' LC update successful.' + bcolors.ENDC)
@@ -437,17 +461,14 @@ def post_lc(source):
         print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC)
         return
 
-    if len(result.parameters) == 5:
-        x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
-        c_nstds = np.round(np.abs((result.parameters[4]-c)/c_std), 1)
-    elif len(result.parameters) == 4:
-        x1_nstds = np.round(np.abs((result.parameters[2]-x1)/x1_std), 1)
-        c_nstds = np.round(np.abs((result.parameters[3]-c)/c_std), 1)
+    x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
+    c_nstds = np.round(np.abs((result.parameters[4]-c)/c_std), 1)
 
     sncosmo.plot_lc(dfit, model=fitted_model)
     plt.savefig('temp.png')
 
-    resp = post_comment(source, 'sncosmo light curve fit n='+str(len(data))+', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds), 'temp.png', source+'_sncosmo_lc.png')
+    resp = post_comment(source, 'sncosmo light curve fit n='+str(len(data))+', M_peak = '+str(np.round(get_peak_absmag(result.parameters[0], result.parameters[2]),1))+
+        ', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds), 'temp.png', source+'_sncosmo_lc.png')
 
     if resp['status'] == 'success':
         print(bcolors.OKGREEN + source + ' LC upload successful.' + bcolors.ENDC)

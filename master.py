@@ -9,7 +9,7 @@ import pandas as pd
 import pickle
 import pytz
 import re
-import requests, json
+import requests, json, simplejson
 import sys, getopt, argparse
 import webbrowser as wb
 import xlsxwriter
