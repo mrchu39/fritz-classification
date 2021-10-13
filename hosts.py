@@ -112,16 +112,19 @@ def get_host_info(ztfname):
     while it < 3:
         try:
             data.get_info(skip_marshal_info=True)
+            with suppress_stdout():
+                data.get_host_cat()
+
             break
         except requests.exceptions.ConnectionError:
-            i += 1
+            it += 1
             pass
+        except NameError:
+            print(bcolors.FAIL + 'No host in area.' + bcolors.ENDC)
+            it = 3
 
     if it == 3:
         return None, None, None, None, None
-
-    with suppress_stdout():
-        data.get_host_cat()
 
     try:
         conra = float(data.host_cat.best_cat.raMean)
@@ -189,24 +192,24 @@ def post_host(source):
         comment = comment_info['text']
 
         if 'potential host' in comment:
-            #if comment.split(':')[1].split(',')[0].strip() != hostname:
-            if redshift != None:
-                resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'potential host: '+hostname+', ra = '+str(hostra)+
-                    ', dec = '+str(hostdec)+', z = '+str(redshift)+', type = '+hosttype+'. host page: http://gayatri.caltech.edu:88/query/host/'+source, 'test_host.png', source+'_host.png')
-            else:
-                resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'potential host: '+hostname+', ra = '+str(hostra)+
-                    ', dec = '+str(hostdec)+', type = '+hosttype+'. host page: http://gayatri.caltech.edu:88/query/host/'+source, 'test_host.png', source+'_host.png')
+            if comment.split(':')[1].split(',')[0].strip() != hostname:
+                if redshift != None:
+                    resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'potential host: '+hostname+', ra = '+str(hostra)+
+                        ', dec = '+str(hostdec)+', z = '+str(redshift)+', type = '+hosttype+'. host page: http://gayatri.caltech.edu:88/query/host/'+source, 'test_host.png', source+'_host.png')
+                else:
+                    resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'potential host: '+hostname+', ra = '+str(hostra)+
+                        ', dec = '+str(hostdec)+', type = '+hosttype+'. host page: http://gayatri.caltech.edu:88/query/host/'+source, 'test_host.png', source+'_host.png')
 
-            if resp['status'] == 'success':
-                print(bcolors.OKGREEN + source + ' host association update successful.' + bcolors.ENDC)
-                return
+                if resp['status'] == 'success':
+                    print(bcolors.OKGREEN + source + ' host association update successful.' + bcolors.ENDC)
+                    return
+                else:
+                    print(bcolors.FAIL + source + ' host association update failed.' + bcolors.ENDC)
+                    print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
+                    return
             else:
-                print(bcolors.FAIL + source + ' host association update failed.' + bcolors.ENDC)
-                print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
+                print(source + ' already has an associated host.')
                 return
-            #else:
-            #    print(source + ' already has an associated host.')
-            #    break
 
     if redshift != None:
         resp = post_comment(source, 'potential host: '+hostname+', ra = '+str(hostra)+', dec = '+str(hostdec)+', z = '+str(redshift)+
