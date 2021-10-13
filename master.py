@@ -33,6 +33,7 @@ if 'info.info' not in os.listdir(os.getcwd()): # Retrieves API key info and loca
 
 from func import *
 from snid import *
+from hosts import *
 
 # Create data directory if one does not exist
 test = os.listdir(os.getcwd())
@@ -63,7 +64,7 @@ sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_
 
 option = ''
 while option != 0: # Select options
-    print('1: Check for missing redshifts\n2: Classify unclassified sources\n3: Check and upload light curve data\n4: Submit Fritz classifications to TNS')
+    print('1: Check for missing redshifts\n2: Classify unclassified sources\n3: Check and upload light curve data\n4: Associate hosts with saved sources\n5: Submit Fritz classifications to TNS')
     option = int(input('Enter in what you want to do, 0 to exit, or "all" to do all: '))
 
     if option == 1 or option == 'all':
@@ -103,6 +104,16 @@ while option != 0: # Select options
             post_lc(phot_sources[p])
 
     if option == 4 or option == 'all':
+
+        print(bcolors.OKGREEN + 'Checking for hosts...' + bcolors.ENDC)
+
+        saved_sources = np.append(sources, unclassifys)
+
+        for i in np.arange(0,len(saved_sources)):
+            print(bcolors.OKCYAN + str(i+1) + '/' + str(len(saved_sources)) + bcolors.ENDC + ': ' + bcolors.OKBLUE + saved_sources[i] + bcolors.ENDC)
+            post_host(saved_sources[i])
+
+    if option == 5 or option == 'all':
         print(bcolors.OKGREEN + 'Beginning TNS submissions...' + bcolors.ENDC)
 
         print('There are ' + str(len(sources)) + ' objects saved or classified later than ' + str(startd) + ' with classifications.')

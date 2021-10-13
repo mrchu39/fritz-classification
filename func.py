@@ -268,7 +268,8 @@ def class_submission(sources, tns_names, classifys, class_dates):
                 continue
 
             if check_TNS_class(ztfname) == 'ZTF':
-                continue
+                if input(ztfname + ' already uploaded to TNS by ZTF, submit another classification? [y/n] ') != 'y':
+                    continue
 
             class_date = class_dates[sc]
             classify = classifys[sc]
@@ -1104,9 +1105,9 @@ def get_TNS_classification_ID(classification):
         Returns : TNS ID
     '''
 
-    class_ids = {"Other": 0, "Supernova": 1, "Type I": 2, "Ia": 3, "Ia-norm": 3, "Ib": 4, "Ib-norm": 3, "Ic": 5, "Ic-norm": 3, "Ib/c": 6, "Ic-BL": 7, "Ib-Ca-rich": 8, "Ibn": 9, "Type II": 10, "II-norm": 10, "IIP": 11, "IIL": 12, "IIn": 13, "IIb": 14,
+    class_ids = {"Other": 0, "Supernova": 1, "Type I": 2, "Ia": 3, "Ia-norm": 3, "Ib": 4, "Ib-norm": 4, "Ic": 5, "Ic-norm": 5, "Ib/c": 6, "Ic-BL": 7, "Ib-Ca-rich": 8, "Ibn": 9, "Type II": 10, "II-norm": 10, "IIP": 11, "IIL": 12, "IIn": 13, "IIb": 14,
         "I-faint": 15, "I-rapid": 16, "SLSN-I": 18, 'Ic-SLSN': 18, "SLSN-II": 19, "SLSN-R": 20, "Afterglow": 23, "LBV": 24, "ILRT": 25, "Novae": 26, "Cataclysmic": 27, "Stellar variable": 28, "AGN": 29, "Galactic Nuclei": 30, "QSO": 31, "Light-Echo": 40,
-        "Std-spec": 50, "Gap": 60, "Gap I": 61, "Gap II": 62, "LRN": 65, "FBOT": 66, "kilonova": 70, "Impostor-SN": 99, "Ia-pec": 100, "Ia-SC": 102, "Ia-91bg": 103, "Ia-91T": 104, "Ia-02cx": 105,
+        "Std-spec": 50, "Gap": 60, "Gap I": 61, "Gap II": 62, "LRN": 65, "FBOT": 66, "kilonova": 70, "Impostor-SN": 99, "Ia-pec": 100, "Ia-SC": 102, "Ia-03fg": 102, "Ia-91bg": 103, "Ia-91T": 104, "Ia-02cx": 105,
         "Ia-CSM": 106, "Ib-pec": 107, "Ic-pec": 108, "Icn": 109, "Ibn/Icn": 110, "II-pec": 111, "IIn-pec": 112, "Tidal Disruption Event": 120, "FRB": 130, "Wolf-Rayet": 200, "WR-WN": 201, "WR-WC": 202, "WR-WO": 203, "M dwarf": 210,
         "Computed-Ia": 1003, "Computed-IIP": 1011, "Computed-IIb": 1014, "Computed-PISN": 1020, "Computed-IIn": 1021}
 
@@ -1393,8 +1394,8 @@ def post_comment(ztfname, text, attach=None, attach_name=None):
         Returns : API response
     '''
 
-    data = {  "obj_id": ztfname,
-              "text": text,
+    data = {
+            "text": text,
            }
 
     if attach != None:
@@ -1403,7 +1404,7 @@ def post_comment(ztfname, text, attach=None, attach_name=None):
 
         data['attachment'] = {'body': at_str, 'name': attach_name}
 
-    url = BASEURL+'api/comment'
+    url = BASEURL+'api/sources/'+ztfname+'/comments'
 
     response = api('POST', url, data=data)
 
@@ -1428,9 +1429,9 @@ def edit_comment(ztfname, comment_id, author_id, text, attach=None, attach_name=
         data['attachment_name'] = attach_name
         data['attachment_bytes'] = at_str
 
-    url = BASEURL+'api/comment'
+    url = BASEURL+'api/sources/'+ztfname+'/comments/'+str(comment_id)
 
-    response = api('PUT', url+'/'+str(comment_id)+'/object', data=data)
+    response = api('PUT', url, data=data)
 
     return response
 
@@ -1504,7 +1505,9 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
     f = open (listdir+'/'+outfile+'.ascii','w')
     f.write('Source Name'+'\t'+'TNS Name'+'\t'+'Saved Date'+'\t'+'Classification'+'\t'+'Classification Date'+'\t'+'redshift'+'\n')
 
-    for i in tqdm(range (get_number('41', dat)), desc='Downloading sources...'):
+    num_rcf = range (get_number('41', dat))
+
+    for i in tqdm(num_rcf, desc='Downloading sources...'):
 
         source_name = response['data']['sources'][i]['obj_id']
         saved_date = response['data']['sources'][i]['saved_at']
@@ -1524,7 +1527,7 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
 
     output = sorted(zip(class_date, srcs, TNS, dates, classify, reds), reverse=True)
 
-    for i in range (get_number('41', dat)):
+    for i in num_rcf:
 
         f.write(output[i][1]+'\t'+output[i][2]+'\t'+output[i][3]+'\t'+output[i][4]+'\t'+output[i][0]+'\t'+output[i][5]+'\n')
 

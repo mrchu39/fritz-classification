@@ -147,13 +147,13 @@ def snid_analyze(source):
     snid = subprocess.Popen(bashc, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
 
     # SNID takes several seconds to generate an output file, but Python moves on immediately after the subprocess
-    # This waits 5 seconds, checking whether or not the output file exists in 0.01 sec intervals
-    # If over 5 seconds pass, it assumes no file was generated because SNID did not converge
+    # This waits 10 seconds, checking whether or not the output file exists in 0.01 sec intervals
+    # If over 10 seconds pass, it assumes no file was generated because SNID did not converge
     count = 0
     while not os.path.exists(fname[:-6]+'_snid.output'):
         time.sleep(0.01)
         count += 1
-        if count > 500:
+        if count > 1000:
             print('No file exists, there must not be a decent fit.')
             return None, None, None, None
 
@@ -402,7 +402,6 @@ def post_lc(source):
     '''
 
     data = get_photometry(source)
-
     comment_infos = get_source_api(source)['comments']
 
     for i in range (len(get_source_api(source)['comments'])):
@@ -418,6 +417,9 @@ def post_lc(source):
                     dfit, result, fitted_model = model_lc(source)
                 except RuntimeError:
                     print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC) # Did not converge on fit
+                    return
+                except ValueError:
+                    print(bcolors.FAIL + 'sncosmo encountered value error. Skipping...' + bcolors.ENDC) # Did not converge on fit
                     return
 
                 x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
@@ -446,7 +448,7 @@ def post_lc(source):
                     print(bcolors.OKGREEN + source + ' LC update successful.' + bcolors.ENDC)
                 else:
                     print(bcolors.FAIL + source + ' LC update failed.' + bcolors.ENDC)
-                    print(bcolors.FAIL + resp['data'] + bcolors.ENDC)
+                    print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
 
                 plt.close('all')
 
@@ -459,6 +461,9 @@ def post_lc(source):
         dfit, result, fitted_model = model_lc(source)
     except RuntimeError:
         print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC)
+        return
+    except ValueError:
+        print(bcolors.FAIL + 'sncosmo encountered value error. Skipping...' + bcolors.ENDC) # Did not converge on fit
         return
 
     x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
@@ -474,6 +479,6 @@ def post_lc(source):
         print(bcolors.OKGREEN + source + ' LC upload successful.' + bcolors.ENDC)
     else:
         print(bcolors.FAIL + source + ' LC upload failed.' + bcolors.ENDC)
-        print(bcolors.FAIL + resp['data'] + bcolors.ENDC)
+        print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
 
     plt.close('all')
