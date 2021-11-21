@@ -28,12 +28,13 @@ from urllib.error import HTTPError
 if 'info.info' not in os.listdir(os.getcwd()): # Retrieves API key info and location of SNID
     print('No info file in directory! "info.info" has been generated, enter in the location of SNID, and API information.')
     with open('info.info', 'w') as f:
-        f.write('SNID loc: \nFritz API key: \nTNS API Key: \nTNS Bot ID: ')
+        f.write('SNID loc: \nFritz API key: \nTNS API Key: \nTNS Bot ID: \nZooniverse username: \nZoonviverse Password: ')
     exit()
 
 from func import *
 from snid import *
 from hosts import *
+from zooniverse import *
 
 # Create data directory if one does not exist
 test = os.listdir(os.getcwd())
@@ -41,6 +42,19 @@ if 'data' not in test:
     os.mkdir('data')
 
 print('Welcome to the master script!')
+
+entered = input('Enter in the earliest date you want to check classifications or saves (YYYY-MM-DD) or \'y\' for yesterday at midnight: ')
+
+if entered == 'Y' or entered == 'y':
+    startd = datetime.datetime.combine((datetime.datetime.utcnow().date() - datetime.timedelta(days=1)), datetime.datetime.min.time()).replace(tzinfo=datetime.timezone.utc)
+else:
+    startd = datetime.datetime.strptime(entered, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
+
+if input('Check for new Zooniverse classifications? [y/n] ') == 'y':
+    pull_class(startd)
+
+print(bcolors.OKGREEN + 'Continuing...' + bcolors.ENDC)
+
 if 'RCF_sources.ascii' not in test:
     since = input('Enter earliest date to download sources from (YYYY-MM-DD) or enter nothing to set it to 6 months ago: ')
     get_source_file('RCF_sources', since)
@@ -53,14 +67,22 @@ else:
 
 f = ascii.read("RCF_sources.ascii") #ascii file containing the names of sources and their saved dates
 
-entered = input('Enter in the earliest date you want to check classifications or saves (YYYY-MM-DD) or \'y\' for yesterday at midnight: ')
-
-if entered == 'Y' or entered == 'y':
-    startd = datetime.datetime.combine((datetime.datetime.utcnow().date() - datetime.timedelta(days=1)), datetime.datetime.min.time()).replace(tzinfo=datetime.timezone.utc)
-else:
-    startd = datetime.datetime.strptime(entered, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
-
 sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Parses data from ASCII file according to previous input
+
+if 'zooniverse.ascii' not in os.listdir(os.getcwd()):
+    with open('zooniverse.ascii', 'w') as file:
+        file.write('ztfname\tdate\n')
+
+converters = {'ztfname': [ascii.convert_numpy(np.str)], 'date': [ascii.convert_numpy(np.str)]}
+zoo = ascii.read('zooniverse.ascii', converters=converters)
+
+remove_indices = []
+for z in range(len(zoo)):
+    if datetime.datetime.strptime(zoo['date'][z], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc).date() < datetime.datetime.utcnow().date() - datetime.timedelta(days=180):
+        remove_indices.append(z)
+
+zoo.remove_rows(remove_indices)
+ascii.write(zoo, 'zooniverse.ascii', overwrite=True)
 
 option = ''
 while option != 0: # Select options

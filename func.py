@@ -14,6 +14,7 @@ import requests, json, simplejson
 import sys, getopt, argparse
 import webbrowser as wb
 import xlsxwriter
+import warnings
 
 from astropy import constants as const
 from astropy.cosmology import FlatLambdaCDM
@@ -165,7 +166,7 @@ def api(method, endpoint, data=None, params=None, timeout=10):
         except requests.exceptions.Timeout:
             print('Timeout Exception, restarting...')
             continue
-        except (json.decoder.JSONDecodeError, simplejson.errors.JSONDecodeError):
+        except (json.decoder.JSONDecodeError, simplejson.errors.JSONDecodeError, requests.exceptions.SSLError):
             #print('JSON Decode Error, restarting...')
             continue
 
@@ -222,14 +223,14 @@ def check_TNS_class(ztfname):
     class_data = response.text.split('Classification Reports', 2)[1]
 
     if 'no-data' in class_data.split('class="clear"')[0]:
-        return
+        return None, None
 
     class_info = class_data.split('class="odd"')[1]
 
     print(ztfname + ' classified as ' + class_info.split('"cell-type">')[1].split('<')[0] + ' by ' + class_info.split('"cell-user_name">')[1].split('<')[0] + ' at ' +
           class_info.split('"cell-time_received">')[1].split('<')[0] + '.')
 
-    return class_info.split('"cell-source_group_name">')[1].split('<')[0]
+    return class_info.split('"cell-source_group_name">')[1].split('<')[0], class_info.split('"cell-type">')[1].split('<')[0]
 
 def class_submission(sources, tns_names, classifys, class_dates):
 
@@ -251,7 +252,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
 
             comment = get_source_api(source)['comments'][i]['text']
 
-            if comment == 'Uploaded to TNS':
+            if comment == 'Uploaded to TNS' and source != 'ZTF18adbbhww':
                 print(ztfname + ' already uploaded to TNS.')
                 flag = 1
                 continue
@@ -267,12 +268,24 @@ def class_submission(sources, tns_names, classifys, class_dates):
                 print(ztfname + ' not reported to TNS yet.')
                 continue
 
-            if check_TNS_class(ztfname) == 'ZTF':
-                if input(ztfname + ' already uploaded to TNS by ZTF, submit another classification? [y/n] ') != 'y':
-                    continue
-
             class_date = class_dates[sc]
             classify = classifys[sc]
+
+            prior, type = check_TNS_class(ztfname)
+
+            if prior != None:
+                if type == fritz_to_TNS_class(classify):
+                    print(ztfname + ' already uploaded to TNS with same classification.')
+                    continue
+                else:
+                    if prior == 'ZTF':
+                        if input(ztfname + ' already uploaded to TNS by ZTF, submit another classification? [y/n] ') != 'y':
+                            continue
+                    else:
+                        if input(ztfname + ' already uploaded to TNS by ' + prior + ', submit another classification? [y/n] ') != 'y':
+                            continue
+
+
 
             #print (classify, class_date)
 
@@ -1106,16 +1119,80 @@ def get_TNS_classification_ID(classification):
     '''
 
     class_ids = {"Other": 0, "Supernova": 1, "Type I": 2, "Ia": 3, "Ia-norm": 3, "Ib": 4, "Ib-norm": 4, "Ic": 5, "Ic-norm": 5, "Ib/c": 6, "Ic-BL": 7, "Ib-Ca-rich": 8, "Ibn": 9, "Type II": 10, "II-norm": 10, "IIP": 11, "IIL": 12, "IIn": 13, "IIb": 14,
-        "I-faint": 15, "I-rapid": 16, "SLSN-I": 18, 'Ic-SLSN': 18, "SLSN-II": 19, "SLSN-R": 20, "Afterglow": 23, "LBV": 24, "ILRT": 25, "Novae": 26, "Cataclysmic": 27, "Stellar variable": 28, "AGN": 29, "Galactic Nuclei": 30, "QSO": 31, "Light-Echo": 40,
+        "I-faint": 15, "I-rapid": 16, "SLSN-I": 18, 'Ic-SLSN': 18, "SLSN-II": 19, "SLSN-R": 20, "Afterglow": 23, "LBV": 24, "ILRT": 25, "Novae": 26, "Classical Nova": 26, "Cataclysmic": 27, "Stellar variable": 28, "AGN": 29, "Galactic Nuclei": 30, "QSO": 31, "Light-Echo": 40,
         "Std-spec": 50, "Gap": 60, "Gap I": 61, "Gap II": 62, "LRN": 65, "FBOT": 66, "kilonova": 70, "Impostor-SN": 99, "Ia-pec": 100, "Ia-SC": 102, "Ia-03fg": 102, "Ia-91bg": 103, "Ia-91T": 104, "Ia-02cx": 105,
         "Ia-CSM": 106, "Ib-pec": 107, "Ic-pec": 108, "Icn": 109, "Ibn/Icn": 110, "II-pec": 111, "IIn-pec": 112, "Tidal Disruption Event": 120, "FRB": 130, "Wolf-Rayet": 200, "WR-WN": 201, "WR-WC": 202, "WR-WO": 203, "M dwarf": 210,
         "Computed-Ia": 1003, "Computed-IIP": 1011, "Computed-IIb": 1014, "Computed-PISN": 1020, "Computed-IIn": 1021}
 
     #keys = np.array(class_ids.keys())
-    for keys in class_ids:
-        if (keys == classification):
-            classkey = class_ids[keys]
-            return classkey
+    return class_ids[classification]
+
+def fritz_to_TNS_class(classification):
+    object_types = {
+        "0": "Other",
+        "1": "SN",
+        "2": "SN I",
+        "3": "SN Ia",
+        "4": "SN Ib",
+        "5": "SN Ic",
+        "6": "SN Ib/c",
+        "7": "SN Ic-BL",
+        "8": "SN Ib-Ca-rich",
+        "9": "SN Ibn",
+        "10": "SN II",
+        "11": "SN IIP",
+        "12": "SN IIL",
+        "13": "SN IIn",
+        "14": "SN IIb",
+        "15": "SN I-faint",
+        "16": "SN I-rapid",
+        "18": "SLSN-I",
+        "19": "SLSN-II",
+        "20": "SLSN-R",
+        "23": "Afterglow",
+        "24": "LBV",
+        "25": "ILRT",
+        "26": "Nova",
+        "27": "CV",
+        "28": "Varstar",
+        "29": "AGN",
+        "30": "Galaxy",
+        "31": "QSO",
+        "40": "Light-Echo",
+        "50": "Std-spec",
+        "60": "Gap",
+        "61": "Gap I",
+        "62": "Gap II",
+        "65": "LRN",
+        "66": "FBOT",
+        "70": "Kilonova",
+        "99": "Impostor-SN",
+        "100": "SN Ia-pec",
+        "102": "SN Ia-SC",
+        "103": "SN Ia-91bg-like",
+        "104": "SN Ia-91T-like",
+        "105": "SN Iax[02cx-like]",
+        "106": "SN Ia-CSM",
+        "107": "SN Ib-pec",
+        "108": "SN Ic-pec",
+        "109": "SN Icn",
+        "110": "SN Ibn/Icn",
+        "111": "SN II-pec",
+        "112": "SN IIn-pec",
+        "120": "TDE",
+        "130": "FRB",
+        "200": "WR",
+        "201": "WR-WN",
+        "202": "WR-WC",
+        "203": "WR-WO",
+        "210": "M dwarf",
+        "1003": "Computed-Ia",
+        "1011": "Computed-IIP",
+        "1014": "Computed-IIb",
+        "1020": "Computed-PISN",
+        "1021": "Computed-IIn"}
+
+    return object_types[str(get_TNS_classification_ID(classification))]
 
 def get_TNS_information(ztfname):
 

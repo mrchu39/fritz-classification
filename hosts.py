@@ -112,14 +112,15 @@ def get_host_info(ztfname):
     while it < 3:
         try:
             data.get_info(skip_marshal_info=True)
-            with suppress_stdout():
-                data.get_host_cat()
+            #with suppress_stdout():
+            data.get_host_cat()
 
             break
         except requests.exceptions.ConnectionError:
+            print(it)
             it += 1
             pass
-        except NameError:
+        except (NameError, IndexError, ValueError):
             print(bcolors.FAIL + 'No host in area.' + bcolors.ENDC)
             it = 3
 
@@ -130,8 +131,11 @@ def get_host_info(ztfname):
         conra = float(data.host_cat.best_cat.raMean)
         condec = float(data.host_cat.best_cat.decMean)
     except AttributeError:
-        conra = float(data.host_cat.best_cat.ra)
-        condec = float(data.host_cat.best_cat.dec)
+        try:
+            conra = float(data.host_cat.best_cat.ra)
+            condec = float(data.host_cat.best_cat.dec)
+        except AttributeError:
+            return None, None, None, None, None
 
     hostname, hostra, hostdec, hosttype, redshift = cross_ref_NED(conra, condec)
 
@@ -177,7 +181,13 @@ def get_host_info(ztfname):
 
 def post_host(source):
 
-    hostname, hostra, hostdec, hosttype, redshift = get_host_info(source)
+    flag = 0
+    while flag == 0:
+        try:
+            hostname, hostra, hostdec, hosttype, redshift = get_host_info(source)
+            flag = 1
+        except requests.exceptions.ReadTimeout:
+            continue
 
     if hostname == None:
         return
@@ -186,12 +196,12 @@ def post_host(source):
 
     flag = 0
 
-    for i in range (len(get_source_api(source)['comments'])):
+    for i in range (len(comment_infos)):
 
         comment_info = comment_infos[i]
         comment = comment_info['text']
 
-        if 'potential host' in comment:
+        if 'potential host:' in comment:
             if comment.split(':')[1].split(',')[0].strip() != hostname:
                 if redshift != None:
                     resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'potential host: '+hostname+', ra = '+str(hostra)+

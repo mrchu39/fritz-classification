@@ -1,5 +1,9 @@
 import base64
 import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.ticker import MultipleLocator
+import matplotlib.gridspec as gridspec
 import numpy as np
 import os
 import shlex
@@ -8,9 +12,16 @@ import sncosmo
 import subprocess
 import sys
 import time
+import glob
+import copy
+import gc
+import pandas as pd
+from collections import Counter
+from mpl_toolkits.mplot3d import Axes3D
+from panoptes_client import Panoptes, Project, SubjectSet, Subject
 
 from astropy.io import ascii
-from astropy.table import QTable
+from astropy.table import QTable, Table
 from func import *
 
 # These numbers come from running model fits on ~500 Type Ia supernovae
@@ -23,8 +34,11 @@ c_std = 0.15670291093588692
 x0 = 0.0007648532623426458
 x0_std = 0.0004363803462578883
 
-with open('info.info', 'r') as f:
-    SNID_loc = f.read().split('\n')[0].split(':')[1].strip()
+with open('info.info', 'r') as infofile:
+    info = infofile.read()
+    SNID_loc = info.split('\n')[0].split(':')[1].strip()
+    zoo_user = info.split('\n')[4].split(':')[1].strip()
+    zoo_pass = info.split('\n')[5].split(':')[1].strip()
 
 def get_peak_absmag(z, x0):
 
@@ -142,9 +156,9 @@ def snid_analyze(source):
     if fname == 'No Spectra Found' or fname == 'Resuming...': # Return None if no spectrum on Fritz or if user prompts to continue
         return None, None, None, None
 
-    # Runs SNID shell command, verbose suppresses output in terminal, plot suppresses XWindow, fluxout saves template spectra with 10 highest rlap scores
-    bashc = shlex.split(SNID_loc + 'snid verbose=0 plot=0 fluxout=10 ' + os.getcwd() + '/data/' + fname)
-    snid = subprocess.Popen(bashc, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    # Runs SNID shell command, verbose suppresses output in terminal, plot suppresses XWindow, fluxout saves template spectra with 100 highest rlap scores
+    bashc = shlex.split(SNID_loc + 'snid verbose=0 plot=0 fluxout=100 tempdir=' + SNID_loc + 'templates-2.0/ ' + os.getcwd() + '/data/' + fname)
+    snid = subprocess.call(bashc)
 
     # SNID takes several seconds to generate an output file, but Python moves on immediately after the subprocess
     # This waits 10 seconds, checking whether or not the output file exists in 0.01 sec intervals
@@ -190,32 +204,184 @@ def snid_analyze(source):
     # Generate outfile directory for transient
     os.mkdir('outfiles/'+fname[:-6])
 
-    # Gather all generated files, again we need to wait for SNID to generate them all so we sleep in 0.01 sec intervals until 12 files are generated
-    # It generates the 10 highest rlap templates, plus the output file, and the object spectrum (same in shape to the ASCII file)
-    test = os.listdir(os.getcwd())
-    fo = [f for f in test if fname[:-6] in f]
-    while len(fo) < 12:
-        test = os.listdir(os.getcwd())
-        fo = [f for f in test if fname[:-6] in f]
-        time.sleep(0.01)
+    print('Determining best matches...')
 
     i = 0
+    test = os.listdir(os.getcwd())
     t_spec = ascii.read(fname[:-6]+'_snidflux.dat')
     for item in test:
         if item.startswith(fname[:-6]):
-            if item.endswith('.dat') and item != fname[:-6]+'_snidflux.dat':
-                fit = ascii.read(item)
-                # This will plot all of the template spectra over the Fritz spectra
-                plt.figure(i)
-                plt.plot(t_spec['wavelength[A]'], t_spec['flux[arbitraty]'])
-                plt.plot(fit['col1'], fit['col2'])
-                # Title template SNe, classification, rlap score
-                plt.title(temp[i] + ', ' + typ_f[i] + ', ' + rlap[i])
-                # Also saves figures to same folder
-                plt.savefig(os.getcwd()+'/outfiles/'+fname[:-6]+'/'+item[:-4]+'.png')
-                i += 1
-            # SNID generates files in the working directory, so move the files to the created directory
             shutil.move(item, os.getcwd()+'/outfiles/'+fname[:-6])
+
+    shutil.copy(os.getcwd() + '/data/' + fname, os.getcwd() + '/outfiles/' + fname[:-6])
+
+    directory = os.getcwd() + "/outfiles/" + fname[:-6] + "/"
+    file_list = glob.glob(directory + fname[:-6] + "_snid.output")
+
+    Table_List = []
+    sample_length = 1
+    count = 0
+    for i in file_list:
+        templates_list = Table.read(i, format = "ascii", data_start = 34, data_end = 200, names = ["no", "sn", "type", "lap", "rlap", "z", "zerr", "age", "age_flag", "grade"])
+        new_i = i.split("/")[-2]
+        Table_List.append([new_i, templates_list])
+        count += 1
+    snidoutput = np.asarray(Table_List)
+
+    ZTable_best = Table(
+                    names=("Version", "ZTF_Name",
+                           "z_sntemplate", "z_rlap", "z_snid", "z_snid_err", "z_level"
+                           , "rank_1", "sntemplate_1", "rlap_1", "c_snid_1", "z_snid_1", "z_snid_err_1", "age_1", "age_flag_1"
+                           , "rank_2", "sntemplate_2", "rlap_2", "c_snid_2", "z_snid_2", "z_snid_err_2", "age_2", "age_flag_2"
+                           , "rank_3", "sntemplate_3", "rlap_3", "c_snid_3", "z_snid_3", "z_snid_err_3", "age_3", "age_flag_3"
+                           , "rank_4", "sntemplate_4", "rlap_4", "c_snid_4", "z_snid_4", "z_snid_err_4", "age_4", "age_flag_4"
+                           , "rank_5", "sntemplate_5", "rlap_5", "c_snid_5", "z_snid_5", "z_snid_err_5", "age_5", "age_flag_5"
+                    ),
+                    meta={"name": "Redscore Results"},
+                    dtype=("U64", "U64",
+                           "U64", "float64", "float64", "float64", "int32",
+                            "int32", "U64", "float64", "U64", "float64", "float64", "float64", "int32",
+                            "int32", "U64", "float64", "U64", "float64", "float64", "float64", "int32",
+                            "int32", "U64", "float64", "U64", "float64", "float64", "float64", "int32",
+                            "int32", "U64", "float64", "U64", "float64", "float64", "float64", "int32",
+                            "int32", "U64", "float64", "U64", "float64", "float64", "float64", "int32",
+                          )
+                    )
+
+    count = 0
+
+    for j in snidoutput:
+        j[1] = copy.deepcopy(j[1][0:100])
+        nocopys = []
+        for linenum in range(len(j[1])):
+            name = j[1][linenum]["sn"].split('sn')[-1].split('_b')[0]
+            for i in range(linenum, len(j[1])):
+                other_name = j[1][i]["sn"].split('sn')[-1].split('_b')[0]
+                if(((linenum != i) and ((name in other_name) or (other_name in name)) and (np.abs(j[1][linenum]["age"] - j[1][i]["age"]) < 3))):
+                    nocopys.append(i)
+        mocopys_unique = listComplementElements(list(range(len(j[1]))),np.unique(nocopys))
+        j[1] = j[1][mocopys_unique]
+
+        Top50 = copy.deepcopy(j[1][0:50])
+        Top5 = copy.deepcopy(Top50[0:5])
+        types = np.unique(Top50["type"])
+        top5Types = np.unique(Top5["type"])
+
+        row = []
+        row.append(j[0] + ".ascii")
+        row.append(j[0].split("_")[0])
+
+        good = j[1][np.where(j[1]["grade"] == "good")]
+        if("SLSN" in str(j[1][0]["type"])):
+            good = good[np.where(good["z"] <= .5)]
+        else:
+            good = good[np.where(good["z"] <= .2)]
+        if(len(good) != 0):
+            row.append(good[0]["sn"])
+            row.append(good[0]["rlap"])
+            row.append(float(good[0]["z"]))
+            row.append(float(good[0]["zerr"]))
+            row.append(1)
+        else:
+            row.append(j[1][0]["sn"])
+            row.append(j[1][0]["rlap"])
+            row.append(float(j[1][0]["z"]))
+            row.append(float(j[1][0]["zerr"]))
+            row.append(0)
+
+        if(len(top5Types) >= 3):
+            for i in Top5:
+                row.append(i["no"])
+                row.append(i["sn"])
+                row.append(i["rlap"])
+                row.append(i["type"])
+                row.append(i["z"])
+                row.append(i["zerr"])
+                row.append(i["age"])
+                row.append(i["age_flag"])
+        elif(len(top5Types) == 2):
+            if(len(types) == 2):
+                for i in Top5:
+                    row.append(i["no"])
+                    row.append(i["sn"])
+                    row.append(i["rlap"])
+                    row.append(i["type"])
+                    row.append(i["z"])
+                    row.append(i["zerr"])
+                    row.append(i["age"])
+                    row.append(i["age_flag"])
+            else:
+                newType = -1
+                for i in range(len(Top50)):
+                    line = Top50[i]
+                    if(line["type"] not in top5Types):
+                        newType = i
+                        break
+                for i in range(len(Top5)-1,-1,-1):
+                    line = Top5[i]
+                    unique = list(Top5["type"]).count(line["type"])
+                    if(unique > 1):
+                        Top5[i] = Top50[newType]
+                        break
+                Top5.sort("no")
+                for i in Top5:
+                    row.append(i["no"])
+                    row.append(i["sn"])
+                    row.append(i["rlap"])
+                    row.append(i["type"])
+                    row.append(i["z"])
+                    row.append(i["zerr"])
+                    row.append(i["age"])
+                    row.append(i["age_flag"])
+        elif(len(top5Types) == 1):
+            if(len(types) == 1):
+                for i in Top5:
+                    row.append(i["no"])
+                    row.append(i["sn"])
+                    row.append(i["rlap"])
+                    row.append(i["type"])
+                    row.append(i["z"])
+                    row.append(i["zerr"])
+                    row.append(i["age"])
+                    row.append(i["age_flag"])
+            else:
+                for k in range(4,2,-1):
+                    top5Types = np.unique(Top5["type"])
+                    for i in Top50:
+                        if(i["type"] not in top5Types):
+                            Top5[k] = i
+                            break
+                Top5.sort("no")
+                for i in Top5:
+                    row.append(i["no"])
+                    row.append(i["sn"])
+                    row.append(i["rlap"])
+                    row.append(i["type"])
+                    row.append(i["z"])
+                    row.append(i["zerr"])
+                    row.append(i["age"])
+                    row.append(i["age_flag"])
+        try:
+            ZTable_best.add_row(row)
+        except ValueError:
+            print(j[0])
+        count += 1
+
+    datasource = os.getcwd() + "/outfiles/"
+    output = directory
+
+    sample_remaining = ZTable_best
+
+    top_5 = [int(sample_remaining['rank_1']), int(sample_remaining['rank_2']), int(sample_remaining['rank_3']), int(sample_remaining['rank_4']),
+        int(sample_remaining['rank_5'])]
+
+    sample_remaining.to_pandas().to_csv(directory + fname[:-6] + '_samp.csv', index = False)
+
+    for i in sample_remaining:
+        spectra_name = i["Version"].split(".")[0]
+        z_snid = i["z_snid"]
+        plot_best_5(datasource,output,spectra_name,z_snid, top_5, show_redshift = False)
+        gc.collect()
 
     try:
         data, result, fitted_model = model_lc(source) # Run light curve fitting on data
@@ -224,16 +390,11 @@ def snid_analyze(source):
         print('Fitted x0 is ' + str(np.round((result.parameters[2]-x0)/x0_std, 1)) + ' standard deviations from mean')
         print('Fitted x1 is ' + str(np.round((result.parameters[3]-x1)/x1_std, 1)) + ' standard deviations from mean')
         print('Fitted c is ' + str(np.round((result.parameters[4]-c)/c_std, 1)) + ' standard deviations from mean')
-
-        plt.figure(i)
-        sncosmo.plot_lc(data, model=fitted_model)
-        plt.savefig(os.getcwd()+'/outfiles/'+fname[:-6]+'/'+fname[:-6]+'_lc.png')
     except RuntimeError:
         pass
 
-    plt.show()
-
     save = input('Save classification for source? [y/n] ')
+    #save == 'n'
     if save == 'y':
         # Templates are ordered by rlap score, so by default we would want the first one
         save2 = input(source + ' will be classified as ' + typ_f[0] + ' with rlap value of ' + rlap[0] + '. Enter nothing to proceed or enter in the number of another template. ')
@@ -247,12 +408,203 @@ def snid_analyze(source):
             except ValueError:
                 return None, None, None, None
     else:
+        converters = {'ztfname': [ascii.convert_numpy(np.str)], 'date': [ascii.convert_numpy(np.str)]}
+        zoo = ascii.read('zooniverse.ascii', converters=converters)
+
+        if source in np.array(zoo['ztfname']):
+            print(source + ' already submitted to Zooniverse within the last 6 months.')
+            return None, None, None, None
+
+        zoo_sub = input('Submit to Zooniverse? [y/n] ')
+
+        if zoo_sub == 'y':
+
+            RedshiftClass = sample_remaining
+
+            indicies = []
+            taken = []
+            counter = 0
+            for i in RedshiftClass:
+                if not("Ia" in i["c_snid_1"] and i["rlap_1"] > 10):
+                    indicies.append(counter)
+                    taken.append(i["ZTF_Name"])
+                counter+=1
+
+            manifest = Table(
+                names=("!ZTF_Version", "!ZTF_Name", "#Image0", "#Image1", "#Image2", "#Image3", "#Image4", "z_snid", "z_snid_err"
+                ),
+                meta={"name": "Spectrum Results after SNID"},
+                dtype=("U64", "U64", "U64", "U64", "U64", "U64", "U64", "float64", "float64"
+                      )
+                )
+
+            for i in RedshiftClass:
+                row = []
+                version = i["Version"].split('.')[0]
+                row.append(version)
+                row.append(i["ZTF_Name"])
+
+                rank = i["rank_1", "rank_2", "rank_3", "rank_4", "rank_5"]
+                list_index = [rank["rank_1"], rank["rank_2"], rank["rank_3"], rank["rank_4"], rank["rank_5"]]
+
+                for j in list_index:
+                    row.append("snidfits_emclip_" + version + "_" + str(j)+".png")
+                row.append(round(i["z_snid"],3))
+                row.append(round(i["z_snid_err"],3))
+                manifest.add_row(row)
+
+            manifest.to_pandas().to_csv(directory + "manifest.csv", index = False)
+
+            Panoptes.connect(username=zoo_user, password=zoo_pass)
+
+            project = Project.find(12959)
+
+            subject_set = SubjectSet()
+
+            subject_set.links.project = project
+            subject_set.display_name = 'Newly Unclassified'
+
+            subject_set = SubjectSet.find(99282)
+
+            ImageLoc = directory
+
+            subject_set.save()
+
+            count = 1
+
+            new_subjects = []
+            f = open(directory + "noFile2.txt", "w")
+            for i in manifest:
+                try:
+                    subject = Subject()
+
+                    subject.links.project = project
+
+                    subject.add_location(ImageLoc + i["#Image0"])
+                    subject.add_location(ImageLoc + i["#Image1"])
+                    subject.add_location(ImageLoc + i["#Image2"])
+                    subject.add_location(ImageLoc + i["#Image3"])
+                    subject.add_location(ImageLoc + i["#Image4"])
+
+                    subject.metadata.update({"!ZTF_Version": i["!ZTF_Version"], "!ZTF_Name": i["!ZTF_Name"], "z_snid": i["z_snid"], "z_snid_err": i["z_snid_err"]})
+
+                    subject.save()
+                    new_subjects.append(subject)
+                except FileNotFoundError:
+                    f.write(i["!ZTF_Version"] + "\n")
+
+            f.close()
+
+            subject_set.add(new_subjects)
+
+            zoo.add_row([source, str(datetime.datetime.utcnow().date())])
+
+            ascii.write(zoo, 'zooniverse.ascii', overwrite=True)
+
+            #plt.close('all')
+            #print(os.listdir(os.getcwd()))
+
+
         return None, None, None, None
 
-    plt.close('all')
-    #print(os.listdir(os.getcwd()))
+def listComplementElements(list1, list2):
+    storeResults = []
 
-    return typ[np.argmax(frac)], frac[np.argmax(frac)], red[np.argmax(frac)], red_err[np.argmax(frac)]
+    for num in list1:
+        if num not in list2: # this will essentially iterate your list behind the scenes
+            storeResults.append(num)
+
+    return storeResults
+
+def read_tables(files):
+    matches_files = files[0:len(files)-1]
+    spectra = Table.read(files[-1], format = "ascii", names = ["wavelength", "flux"])
+    matches = []
+    for i in matches_files:
+        input_data = open(i,'r').readlines()[0].split()
+        row = [[int(input_data[3][:-1]), input_data[4],input_data[5][1::],float(input_data[-3].split("-")[-1]),float(input_data[-1])]]
+        row.append(Table.read(i, format = "ascii", names = ["redshifted_wavelength", "flux"]))
+        matches.append(row)
+    return matches, spectra
+
+def plot_box_spec(wave, flux):
+    flux_plot = np.repeat(flux, 2)
+    wv_plot = wave.copy()
+    wv_plot[:-1] += np.diff(wave)/2
+    wv_plot = np.append(wave[0]-(wave[1]-wave[0])/2,
+                        np.append(np.repeat(wv_plot[0:-1], 2),
+                                  wave[-1]+(wave[-1]-wave[-2])/2))
+
+    return wv_plot, flux_plot
+
+def specplot(x,y,xi,yi,snid_type,fname,output,best_num, z_template, z_template_unc, z_snid,
+             spec_num, show_redshift=False):
+    fig, ax = plt.subplots(figsize=(8,4.5))
+    ax.plot(xi,yi,color='#32384D',alpha=0.5,
+             label='New SN')
+    ax.plot(x,y,color='#217CA3',
+             label='SNID template', lw=3)
+    if show_redshift:
+        ax.plot(x[-3],y[-3],color='white',lw=0,
+                 label=r'$z_\mathrm{} = $ {:.3f}$\,\pm\,${:.3f}'.format("{SNID}", z_template, z_template_unc))
+        ax.text(0.78, 0.955, r'$z_\mathrm{} = ${:.4f}'.format("{SN}", z_snid),
+                va='center',
+                fontsize=15, transform=plt.gcf().transFigure)
+    else:
+        ax.text(0.78, 0.955, 'Match #{}'.format(spec_num + 1),
+                va='center',
+                fontsize=15, transform=plt.gcf().transFigure)
+
+    ax.plot(x[-3],y[-3],color='#217CA3', lw=3)
+    ax.set_xlabel(r'Rest Frame Wavelength ($\mathrm{\AA}$)', fontsize=17)
+    ax.set_ylabel('Relative Flux', fontsize=17)
+    ax.tick_params(which='both',labelsize=15)
+
+    ax.grid(axis='x', color='0.7', ls=':')
+    ax.xaxis.set_minor_locator(MultipleLocator(250))
+    ax.set_yticklabels([])
+
+
+    ax.text(0.105, 0.955, 'SNID type: ',
+            va='center',
+            fontsize=15, transform=plt.gcf().transFigure)
+    ax.text(0.245, 0.955, snid_type,
+            color='#217CA3', weight='bold', va='center',
+            fontsize=23, transform=plt.gcf().transFigure)
+
+
+
+    ax.legend(fancybox=True)
+    fig.subplots_adjust(left=0.055,right=0.99,top=0.925,bottom=0.145)
+    fig.savefig(output + 'snidfits_emclip_' + fname + "_" + str(best_num) + '.png', dpi = 600)
+    #print(output + 'snidfits_emclip_' + fname + "_" + str(best_num) + '.png')
+    plt.close(fig)
+    plt.close()
+
+def plot_best_5(source, output, spectra_name, z_snid, top_5, show_redshift=False):
+    source_folder = source + spectra_name
+
+    files = np.sort(glob.glob(source_folder+"/*.dat"))
+    if(len(files)==0):
+        print('return, ' + spectra_name)
+        return -1
+
+    rel_files = []
+    for i, f in enumerate(files):
+        if 'comp' in f and int(f.split('comp')[1].split('_')[0]) in top_5:
+            rel_files.append(f)
+    rel_files.append(output + '/' + spectra_name + '_snidflux.dat')
+
+    matches, spectra = read_tables(rel_files)
+
+    for spec_num, i in enumerate(matches):
+        z = i[0][3]
+        snid_type = i[0][2][:-1]
+
+        xi, yi = plot_box_spec(spectra["wavelength"], spectra["flux"])
+        xi /= (1+z)
+        x, y = i[1]["redshifted_wavelength"] / (1+z), i[1]["flux"]
+        specplot(x,y,xi,yi,snid_type,spectra_name,output,i[0][0], z, i[0][4], z_snid, spec_num, show_redshift=show_redshift)
 
 def submit_reds(no_reds, f):
 
@@ -411,7 +763,7 @@ def post_lc(source):
 
         # Check if LC is already posted
         if 'sncosmo light curve fit' in comment:
-            if int(comment[int(comment.index('n='))+2:].split(',')[0]) != len(data) or 'x1_nstds' not in comment or 'c_nstds' not in comment or 'M_peak' not in comment: # Check if new photometry has been uploaded
+            if int(comment[int(comment.index('n='))+2:].split(',')[0]) != len(data) or 'gayatri' not in comment: # Check if new photometry has been uploaded
 
                 try:
                     dfit, result, fitted_model = model_lc(source)
@@ -442,7 +794,7 @@ def post_lc(source):
 
                 # If comment exists but new photometry uploaded, edit comment
                 resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'sncosmo light curve fit n='+str(len(data))+', M_peak = '+str(np.round(get_peak_absmag(result.parameters[0], result.parameters[2]),1))+
-                    ', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds), 'temp.png', source+'_sncosmo_lc.png')
+                    ', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds)+'. LC page: http://gayatri.caltech.edu:88/query/lc/'+source, 'temp.png', source+'_sncosmo_lc.png')
 
                 if resp['status'] == 'success':
                     print(bcolors.OKGREEN + source + ' LC update successful.' + bcolors.ENDC)
@@ -473,7 +825,7 @@ def post_lc(source):
     plt.savefig('temp.png')
 
     resp = post_comment(source, 'sncosmo light curve fit n='+str(len(data))+', M_peak = '+str(np.round(get_peak_absmag(result.parameters[0], result.parameters[2]),1))+
-        ', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds), 'temp.png', source+'_sncosmo_lc.png')
+        ', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds)+'. LC page: http://gayatri.caltech.edu:88/query/lc/'+source, 'temp.png', source+'_sncosmo_lc.png')
 
     if resp['status'] == 'success':
         print(bcolors.OKGREEN + source + ' LC upload successful.' + bcolors.ENDC)
