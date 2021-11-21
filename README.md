@@ -104,7 +104,7 @@ After completing all in the list, the script will indicate that the submission p
 ## Plans
 
 - [x] Include additional classification techniques using photometry.
-- ~~[ ] Include RCF checking through the API and with photometry curves. (This is being looked into but may be challenging as it takes significantly longer to do it through API.)~~ This is not really practical as it is too time-inefficient and requires too much user input anyway.
+- [ ] ~~Include RCF checking through the API and with photometry curves. (This is being looked into but may be challenging as it takes significantly longer to do it through API.)~~ This is not really practical as it is too time-inefficient and requires too much user input anyway.
 - [ ] Assigning SEDM follow-ups for noisy data or as addition with RCF checking.
 - [ ] Additional accuracy with Zooniverse
 
