@@ -6,7 +6,6 @@ import os
 import requests
 import warnings
 import imp
-import warnings
 from astroquery.ned import Ned
 from astroquery.sdss import SDSS
 import astropy.units as u

@@ -69,21 +69,6 @@ f = ascii.read("RCF_sources.ascii") #ascii file containing the names of sources 
 
 sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Parses data from ASCII file according to previous input
 
-if 'zooniverse.ascii' not in os.listdir(os.getcwd()):
-    with open('zooniverse.ascii', 'w') as file:
-        file.write('ztfname\tdate\n')
-
-converters = {'ztfname': [ascii.convert_numpy(np.str)], 'date': [ascii.convert_numpy(np.str)]}
-zoo = ascii.read('zooniverse.ascii', converters=converters)
-
-remove_indices = []
-for z in range(len(zoo)):
-    if datetime.datetime.strptime(zoo['date'][z], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc).date() < datetime.datetime.utcnow().date() - datetime.timedelta(days=180):
-        remove_indices.append(z)
-
-zoo.remove_rows(remove_indices)
-ascii.write(zoo, 'zooniverse.ascii', overwrite=True)
-
 option = ''
 while option != 0: # Select options
     print('1: Check for missing redshifts\n2: Classify unclassified sources\n3: Check and upload light curve data\n4: Associate hosts with saved sources\n5: Submit Fritz classifications to TNS')

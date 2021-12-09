@@ -680,24 +680,6 @@ def convert_to_jd(date):
     dat = d.jd
     return dat
 
-def get_all_group_sources(group_id):
-    ''' Info : Query all sources saved in a group
-        Input : group id
-        Returns : List of jsons of all sources in group(s)
-        Comment : Takes a long time
-    '''
-
-    sources = []
-
-    for i in range (get_number_of_sources(group_id)):
-
-        url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id
-        response = api('GET',url)
-        ztfname = response['data']['sources'][i]['obj_id']
-        sources.append(ztfname)
-
-    return sources
-
 def get_all_spectra_id(ztfname):
     ''' Info : Query all spectra corresponding to a source, takes input ZTF name
         Returns : list of spectrum jsons
@@ -843,24 +825,6 @@ def get_group_ids(groupnames=['Redshift Completeness Factor', 'Census of the Loc
 
     return grpids
 
-def get_group_sources(group_id, date):
-    ''' Info : Query all sources saved in a group after a certain date
-        Input : group id, date [yyyy-mm-dd]
-        Returns : List of jsons of all sources in group(s)
-        Comment : Takes a little time based on the date
-    '''
-
-    sources = []
-
-    for i in range (get_number_of_sources(group_id, date)):
-
-        url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id+'&savedAfter='+date+'T00:00:00.000001'
-        response = api('GET',url)
-        ztfname = response['data']['sources'][i]['obj_id']
-        sources.append(ztfname)
-
-    return sources
-
 def get_IAUname(ztfname):
 
     ''' Info : Query the TNS name for any source
@@ -878,20 +842,21 @@ def get_number(group_id, date):
         Returns : Number of sources saved after a given date to the specified group
     '''
 
-    url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id+'&savedAfter='+date+'T00:00:00.000001'
-    response = api('GET',url)
+    num_sources = 0
 
-    return len(response['data']['sources'])
+    page = 1
+    while True:
+        url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id+'&numPerPage=500&pageNumber='+str(page)+'&savedAfter='+date+'T00:00:00.000001'
+        response = api('GET',url)
 
-def get_number_of_sources(group_id, date):
-    ''' Info : Query number of sources saved in a group after a certain date
-        Input : group id, date [yyyy-mm-dd]
-        Returns : Number of sources saved after a given date to the specified group
-    '''
+        if len(response['data']['sources']) == 0:
+            break
+        else:
+            num_sources += len(response['data']['sources'])
 
-    url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id+'&savedAfter='+date+'T00:00:00.000001'
-    response = api('GET',url)
-    return len(response['data']['sources'])
+        page += 1
+
+    return num_sources
 
 def get_pprint(item, indent=0, tab=' '*4, maxwidth=float('inf')):
     """
@@ -1084,24 +1049,6 @@ def get_source_file(outfile, since):
         sourceclassification(outfile) #download the updated list of sources saved to RCF in descending order
     else:
         sourceclassification(outfile, since)
-
-def get_sources(group_id, date):
-    ''' Info : Query all sources saved in a group after a certain date
-        Input : group id, date [yyyy-mm-dd]
-        Returns : List of jsons of all sources in group(s)
-        Comment : Takes a little time based on the date
-    '''
-
-    sources = []
-
-    for i in range (get_number(group_id, date)):
-
-        url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id+'&savedAfter='+date+'T00:00:00.000001'
-        response = api('GET',url)
-        ztfname = response['data']['sources'][i]['obj_id']
-        sources.append(ztfname)
-
-    return sources
 
 def get_spectrum_api(spectrum_id):
     ''' Info : Query all spectra corresponding to a source, takes input ZTF name
@@ -1311,7 +1258,7 @@ def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
     a = get_spectrum_api(specid)
 
     inst = (a['data']['instrument_name'])
-    #print (inst)
+    #print(inst)
 
     if inst == 'SEDM':
 
@@ -1346,6 +1293,20 @@ def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
 
 
     elif inst == 'ALFOSC':
+
+        OBSDATE = a['data']['observed_at'].split('T')[0]
+
+
+        s = (ztfname+'_'+str(OBSDATE)+'_'+str(inst)+'.ascii')
+
+        with open(path+'/data/'+s,'w') as f:
+            f.write(a['data']['original_file_string'])
+        f.close()
+
+        #print (s,'\n')
+        spectrum_name = s
+
+    elif inst == 'KAST':
 
         OBSDATE = a['data']['observed_at'].split('T')[0]
 
@@ -1565,10 +1526,6 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
         Returns : None
     '''
 
-    path = 'https://fritz.science/api/sources?group_ids=41&saveSummary=true&savedAfter='+str(dat)+'T00:00:00.000001'
-
-    response = api('GET',path)
-
     #print('data received')
 
     srcs = []
@@ -1582,29 +1539,44 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
     f = open (listdir+'/'+outfile+'.ascii','w')
     f.write('Source Name'+'\t'+'TNS Name'+'\t'+'Saved Date'+'\t'+'Classification'+'\t'+'Classification Date'+'\t'+'redshift'+'\n')
 
-    num_rcf = range (get_number('41', dat))
+    num_tot = get_number('41', dat)
+    #print(num_tot)
 
-    for i in tqdm(num_rcf, desc='Downloading sources...'):
+    num_pages = int(num_tot/500) + 1
+    #print(num_pages)
 
-        source_name = response['data']['sources'][i]['obj_id']
-        saved_date = response['data']['sources'][i]['saved_at']
-        classification = get_classi(source_name)[0]
-        date = get_classi(source_name)[1]
-        IAU = get_TNSname(source_name)
-        red = str(get_redshift(source_name))
+    for page in range(num_pages):
 
-        #print (i, source_name)
+        path = 'https://fritz.science/api/sources?group_ids=41&saveSummary=true&numPerPage=500&pageNumber='+str(page+1)+'&savedAfter='+str(dat)+'T00:00:00.000001'
 
-        srcs.append(source_name)
-        TNS.append(IAU)
-        dates.append(saved_date.split('T')[0])
-        classify.append(classification)
-        class_date.append(date.split('T')[0])
-        reds.append(red)
+        #print(path)
+
+        response = api('GET',path)
+
+        if len(response['data']['sources']) == 0:
+            break
+
+        for i in tqdm(range(len(response['data']['sources'])), desc='Page ' + str(page+1) + ' of ' + str(num_pages)):
+
+            source_name = response['data']['sources'][i]['obj_id']
+            saved_date = response['data']['sources'][i]['saved_at']
+            classification = get_classi(source_name)[0]
+            date = get_classi(source_name)[1]
+            IAU = get_TNSname(source_name)
+            red = str(get_redshift(source_name))
+
+            #print (i, source_name)
+
+            srcs.append(source_name)
+            TNS.append(IAU)
+            dates.append(saved_date.split('T')[0])
+            classify.append(classification)
+            class_date.append(date.split('T')[0])
+            reds.append(red)
 
     output = sorted(zip(class_date, srcs, TNS, dates, classify, reds), reverse=True)
 
-    for i in num_rcf:
+    for i in range(num_tot):
 
         f.write(output[i][1]+'\t'+output[i][2]+'\t'+output[i][3]+'\t'+output[i][4]+'\t'+output[i][0]+'\t'+output[i][5]+'\n')
 
