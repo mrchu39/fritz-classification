@@ -1,0 +1,10 @@
+glob2
+astropy
+requests
+pandas
+panoptes_client
+sncosmo
+simplejson
+xlsxwriter
+lxml
+tqdm
