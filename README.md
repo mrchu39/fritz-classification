@@ -4,15 +4,13 @@ This tool pulls data from Fritz, uses SNID to classify transients, and uploads c
 ## Requirements
 
 * [Anaconda for Python 3.7+](https://www.anaconda.com/products/individual)
-* [astropy](https://www.astropy.org/)
-* [pandas](https://pandas.pydata.org/)
-* [panoptes](https://github.com/zooniverse/panoptes-python-client)
 * [SNID](https://people.lam.fr/blondin.stephane/software/snid/index.html)
-* [sncosmo](https://sncosmo.readthedocs.io/en/stable/install.html)
 * [superfit](https://github.com/samanthagoldwasser25/superfit)
 * [ztfiaenv](https://github.com/MatSmithAstro/ztfiaenv/tree/main/ztfiaenv)
 
 ## Installation
+
+Install the required Python packages with `pip install -r requirements.txt`.
 
 Installation of SNID is detailed on the above link. Ensure that its dependencies (PGPLOT) are installed. You must download the correct templates for this application. As it is too large to upload here, ask me for them. Installation of superfit is also detailed above, and the correct templates will also need to be installed. Enter in the location the SNID executable is located in the generated info file. Installation of the panoptes client is necessary for the Zooniverse classifications.
 
