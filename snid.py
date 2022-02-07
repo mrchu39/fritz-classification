@@ -37,8 +37,8 @@ x0_std = 0.0004363803462578883
 with open('info.info', 'r') as infofile:
     info = infofile.read()
     SNID_loc = info.split('\n')[0].split(':')[1].strip()
-    zoo_user = info.split('\n')[4].split(':')[1].strip()
-    zoo_pass = info.split('\n')[5].split(':')[1].strip()
+    zoo_user = info.split('\n')[5].split(':')[1].strip()
+    zoo_pass = info.split('\n')[6].split(':')[1].strip()
 
 def get_peak_absmag(z, x0):
 

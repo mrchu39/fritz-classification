@@ -28,7 +28,7 @@ from urllib.error import HTTPError
 if 'info.info' not in os.listdir(os.getcwd()): # Retrieves API key info and location of SNID
     print('No info file in directory! "info.info" has been generated, enter in the location of SNID, and API information.')
     with open('info.info', 'w') as f:
-        f.write('SNID loc: \nFritz API key: \nTNS API Key: \nTNS Bot ID: \nZooniverse username: \nZoonviverse Password: ')
+        f.write('SNID loc: \nSuperfit loc: \nFritz API key: \nTNS API Key: \nTNS Bot ID: \nZooniverse username: \nZoonviverse Password: ')
     exit()
 
 from func import *

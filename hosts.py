@@ -25,7 +25,7 @@ from ztfquery import bts
 #pprint(vars(ztfiaenv.ztfiaenv))
 from ztfiaenv.ztfiaenv.functions import get_DLR
 from ztfiaenv.ztfiaenv import get_host_from_cat
-import ztfiaenv.ztfiaenv.ztfiaenv as ztfiaenv
+import ztfiaenv.ztfiaenv as ztfiaenv
 from contextlib import contextmanager
 import sys, os
 from pprint import pprint

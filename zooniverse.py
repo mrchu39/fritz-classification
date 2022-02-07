@@ -11,12 +11,16 @@ from PIL import Image
 from func import *
 from pprint import pprint
 import time
-from superfit_func import *
 
 with open('info.info', 'r') as infofile:
     info = infofile.read()
-    zoo_user = info.split('\n')[4].split(':')[1].strip()
-    zoo_pass = info.split('\n')[5].split(':')[1].strip()
+    superfit_loc = info.split('\n')[1].split(':')[1].strip()
+    zoo_user = info.split('\n')[5].split(':')[1].strip()
+    zoo_pass = info.split('\n')[6].split(':')[1].strip()
+
+sys.path.insert(1, superfit_loc)
+
+from superfit_func import *
 
 def pull_class(startd):
 

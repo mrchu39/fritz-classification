@@ -1,10 +1,17 @@
+matplotlib
 glob2
 astropy
+astroquery
+astrobject
 requests
 pandas
 panoptes_client
+PyAstronomy
 sncosmo
 simplejson
+sfdmap
+sep
 xlsxwriter
 lxml
 tqdm
+ztfquery

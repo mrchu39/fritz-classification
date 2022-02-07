@@ -29,9 +29,9 @@ from urllib.error import HTTPError
 
 with open('info.info', 'r') as f:
     info = f.read().split('\n')
-    ft = info[1].split(':')[1].strip()
-    tns_apikey = info[2].split(':')[1].strip()
-    tns_botid = info[3].split(':')[1].strip()
+    ft = info[2].split(':')[1].strip()
+    tns_apikey = info[3].split(':')[1].strip()
+    tns_botid = info[4].split(':')[1].strip()
 
 global TOKEN, BASEURL
 GETTOKEN = ft      # Fritz API Key, retrieves from info file
@@ -825,17 +825,6 @@ def get_group_ids(groupnames=['Redshift Completeness Factor', 'Census of the Loc
 
     return grpids
 
-def get_IAUname(ztfname):
-
-    ''' Info : Query the TNS name for any source
-        Input : ZTFname
-        Returns : ATname
-    '''
-
-    url = BASEURL+'api/alerts_aux/'+ztfname
-    response = api('GET',url)
-    return response["data"]["cross_matches"]["TNS"]
-
 def get_number(group_id, date):
     ''' Info : Query number of sources saved in a group after a certain date
         Input : group id, date [yyyy-mm-dd]
@@ -1192,7 +1181,7 @@ def get_TNS_instrument_ID(inst):
             instkey = inst_ids[keys]
             return instkey
 
-def get_TNSname(ztfname):
+def get_IAUname(ztfname):
 
     ''' Info : Query the TNS name for any source
         Input : ZTFname
@@ -1201,9 +1190,33 @@ def get_TNSname(ztfname):
 
     try:
 
-        url = BASEURL+'api/alerts_aux/'+ztfname
-        response = api('GET',url)
-        IAU = response['data']['cross_matches']['TNS']
+        url = 'https://fritz.science/api/alerts_aux/'+ztfname
+        headers = {'Authorization': f'token {GETTOKEN}'}
+
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 404:
+            req_data = {
+                "ra": "",
+                "dec": "",
+                "radius": "",
+                "units": "",
+                "objname": "",
+                "objname_exact_match": 0,
+                "internal_name": ztfname,
+                "internal_name_exact_match": 0,
+                "objid": ""
+            }
+
+            data = {'api_key' : API_KEY, 'data' : json.dumps(req_data)}
+            headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
+            #pprint(headers)
+
+            response = requests.post('https://www.wis-tns.org/api/get/search', headers=headers, data=data)
+
+            return json.loads(response.text)['data']['reply'][0]['prefix'] + ' ' + json.loads(response.text)['data']['reply'][0]['objname']
+
+        IAU = json.loads(response.text)['data']['cross_matches']['TNS']
 
 
         if not IAU:
@@ -1539,7 +1552,9 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
     f = open (listdir+'/'+outfile+'.ascii','w')
     f.write('Source Name'+'\t'+'TNS Name'+'\t'+'Saved Date'+'\t'+'Classification'+'\t'+'Classification Date'+'\t'+'redshift'+'\n')
 
-    num_tot = get_number('41', dat)
+    groupnum = input('Enter in Group ID: ')
+
+    num_tot = get_number(groupnum, dat)
     #print(num_tot)
 
     num_pages = int(num_tot/500) + 1
@@ -1547,7 +1562,7 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
 
     for page in range(num_pages):
 
-        path = 'https://fritz.science/api/sources?group_ids=41&saveSummary=true&numPerPage=500&pageNumber='+str(page+1)+'&savedAfter='+str(dat)+'T00:00:00.000001'
+        path = 'https://fritz.science/api/sources?group_ids=' + groupnum + '&saveSummary=true&numPerPage=500&pageNumber='+str(page+1)+'&savedAfter='+str(dat)+'T00:00:00.000001'
 
         #print(path)
 
@@ -1562,7 +1577,7 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
             saved_date = response['data']['sources'][i]['saved_at']
             classification = get_classi(source_name)[0]
             date = get_classi(source_name)[1]
-            IAU = get_TNSname(source_name)
+            IAU = get_IAUname(source_name)
             red = str(get_redshift(source_name))
 
             #print (i, source_name)

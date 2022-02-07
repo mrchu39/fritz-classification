@@ -12,7 +12,7 @@ This tool pulls data from Fritz, uses SNID to classify transients, and uploads c
 
 Install the required Python packages with `pip install -r requirements.txt`.
 
-Installation of SNID is detailed on the above link. Ensure that its dependencies (PGPLOT) are installed. You must download the correct templates for this application. As it is too large to upload here, ask me for them. Installation of superfit is also detailed above, and the correct templates will also need to be installed. Enter in the location the SNID executable is located in the generated info file. Installation of the panoptes client is necessary for the Zooniverse classifications.
+Installation of SNID is detailed on the above link. Ensure that its dependencies (PGPLOT) are installed. You must download the correct templates for this application. As it is too large to upload here, ask me for them. Installation of superfit is also detailed above, and the correct templates will also need to be installed. Enter in the location the SNID executable and Superfit Python files in the generated info file. Installation of the panoptes client is necessary for the Zooniverse classifications.
 
 Generate your unique Fritz API token by going to your [profile](https://fritz.science/profile), finding "Generate New Token for Command-Line Authentication", entering in a name (this is not important), checking all the boxes, and clicking "generate token". Running the program for the first time will generate a file called `info.info`, enter in the API token where appropriate in the file. **Let the code generate the file, the string must be parsed correctly.**
 
@@ -108,12 +108,18 @@ After completing all in the list, the script will indicate that the submission p
 
 ## Changelog
 
+### 2022-02-07
+
+- Added in functionality to download sources from other groups.
+- Updated for changed Fritz API.
+- Changed `get_IAUname` function for objects without alerts.
+
 ### 2021-11-20
 
-- Added in host association algorithm
-- Improved classification submission logic, only submit if differing classification than on TNS
-- Corrected SNID templates
-- Added in Zooniverse functionality
+- Added in host association algorithm.
+- Improved classification submission logic, only submit if differing classification than on TNS.
+- Corrected SNID templates.
+- Added in Zooniverse functionality.
 
 ### 2021-08-11
 
