@@ -214,9 +214,7 @@ def check_TNS_class(ztfname):
         Returns : Group that reported classification
     '''
 
-    if len(get_IAUname(ztfname)) == 0:
-        return
-    tns_name = get_IAUname(ztfname)[0]["name"][3:]
+    tns_name = get_IAUname(ztfname)[3:]
     data = {'api_key' : API_KEY}
     headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
     response = requests.get('https://www.wis-tns.org/object/'+tns_name, headers=headers, data=data)
@@ -331,7 +329,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         obsdate = str((header['UTC']).split('T')[0])+' '+str((header['UTC']).split('T')[1])
 
                         classificationReport = TNSClassificationReport()
-                        classificationReport.name = get_IAUname(ztfname)[0]['name'][3:]
+                        classificationReport.name = get_IAUname(ztfname)[3:]
                         classificationReport.fitsName = ''
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
@@ -390,7 +388,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         obsdate = str(header['OBSDATE'].split('T')[0])+' '+str(header['OBSDATE'].split('T')[1])
 
                         classificationReport = TNSClassificationReport()
-                        classificationReport.name = get_IAUname(ztfname)[0]['name'][3:]
+                        classificationReport.name = get_IAUname(ztfname)[3:]
                         classificationReport.fitsName = ''
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
@@ -450,7 +448,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         obsdate = str(a['data']['observed_at'].split('T')[0])+' '+str(a['data']['observed_at'].split('T')[1])
 
                         classificationReport = TNSClassificationReport()
-                        classificationReport.name = get_IAUname(ztfname)[0]['name'][3:]
+                        classificationReport.name = get_IAUname(ztfname)[3:]
                         classificationReport.fitsName = ''
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
@@ -509,7 +507,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         OBSDATE = str(a['data']['observed_at'].split('T')[0])+' '+str(a['data']['observed_at'].split('T')[1])
 
                         classificationReport = TNSClassificationReport()
-                        classificationReport.name = get_IAUname(ztfname)[0]['name'][3:]
+                        classificationReport.name = get_IAUname(ztfname)[3:]
                         classificationReport.fitsName = ''
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
@@ -569,7 +567,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         OBSDATE = str(a['data']['observed_at'].split('T')[0])+' '+str(a['data']['observed_at'].split('T')[1])
 
                         classificationReport = TNSClassificationReport()
-                        classificationReport.name = get_IAUname(ztfname)[0]['name'][3:]
+                        classificationReport.name = get_IAUname(ztfname)[3:]
                         classificationReport.fitsName = ''
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
@@ -631,7 +629,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         obsdate = str(a['data']['observed_at'].split('T')[0])+' '+str(a['data']['observed_at'].split('T')[1])
 
                         classificationReport = TNSClassificationReport()
-                        classificationReport.name = get_IAUname(ztfname)[0]['name'][3:]
+                        classificationReport.name = get_IAUname(ztfname)[3:]
                         classificationReport.fitsName = ''
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
@@ -1142,12 +1140,6 @@ def get_TNS_information(ztfname):
 
     IAU = get_IAUname(ztfname)
 
-    if not IAU:
-        IAU = "Not reported to TNS"
-
-    else:
-        IAU = IAU[0]['name']
-
     clas = get_classification(ztfname)
 
     if clas[1] == 'None':
@@ -1216,14 +1208,10 @@ def get_IAUname(ztfname):
 
             return json.loads(response.text)['data']['reply'][0]['prefix'] + ' ' + json.loads(response.text)['data']['reply'][0]['objname']
 
-        IAU = json.loads(response.text)['data']['cross_matches']['TNS']
-
+        IAU = json.loads(response.text)['data']['cross_matches']['TNS'][0]['name']
 
         if not IAU:
             IAU = "Not reported to TNS"
-
-        else:
-            IAU = IAU[0]['name']
 
     except KeyError as e:
         IAU = "Error"
