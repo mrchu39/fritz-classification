@@ -1180,43 +1180,50 @@ def get_IAUname(ztfname):
         Returns : ATname
     '''
 
-    try:
+    url = 'https://fritz.science/api/alerts_aux/'+ztfname
+    headers = {'Authorization': f'token {GETTOKEN}'}
 
-        url = 'https://fritz.science/api/alerts_aux/'+ztfname
-        headers = {'Authorization': f'token {GETTOKEN}'}
+    while True:
 
         response = requests.get(url, headers=headers)
 
-        if response.status_code == 404:
-            req_data = {
-                "ra": "",
-                "dec": "",
-                "radius": "",
-                "units": "",
-                "objname": "",
-                "objname_exact_match": 0,
-                "internal_name": ztfname,
-                "internal_name_exact_match": 0,
-                "objid": ""
-            }
+        if response.status_code != 429:
+            break
 
-            data = {'api_key' : API_KEY, 'data' : json.dumps(req_data)}
-            headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
-            #pprint(headers)
+    if response.status_code != 404 and 'cross_matches' in json.loads(response.text)['data'].keys() and len(json.loads(response.text)['data']['cross_matches']['TNS']) != 0:
+        return json.loads(response.text)['data']['cross_matches']['TNS'][0]['name']
 
-            response = requests.post('https://www.wis-tns.org/api/get/search', headers=headers, data=data)
+    req_data = {
+        "ra": "",
+        "dec": "",
+        "radius": "",
+        "units": "",
+        "objname": "",
+        "objname_exact_match": 0,
+        "internal_name": ztfname.replace('_', ' '),
+        "internal_name_exact_match": 0,
+        "objid": ""
+    }
 
-            return json.loads(response.text)['data']['reply'][0]['prefix'] + ' ' + json.loads(response.text)['data']['reply'][0]['objname']
+    data = {'api_key' : API_KEY, 'data' : json.dumps(req_data)}
+    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
+    #pprint(headers)
 
-        IAU = json.loads(response.text)['data']['cross_matches']['TNS'][0]['name']
+    while True:
+        try:
+            response_tns = requests.post('https://www.wis-tns.org/api/get/search', headers=headers, data=data)
+        except requests.exceptions.ConnectionError:
+            continue
+            
+        if json.loads(response_tns.text)['id_code'] == 429:
+            sleep(1)
+        else:
+            break
 
-        if not IAU:
-            IAU = "Not reported to TNS"
+    if len(json.loads(response_tns.text)['data']['reply']) != 0:
+        return json.loads(response_tns.text)['data']['reply'][0]['prefix'] + ' ' + json.loads(response_tns.text)['data']['reply'][0]['objname']
 
-    except KeyError as e:
-        IAU = "Error"
-
-    return IAU
+    return 'Not reported to TNS'
 
 def get_total_number_of_sources(group_id):
     ''' Info : Query total number of sources saved in a group
