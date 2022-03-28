@@ -119,6 +119,7 @@ while option != 0: # Select options
         for i in np.arange(0,len(saved_sources)):
             print(bcolors.OKCYAN + str(i+1) + '/' + str(len(saved_sources)) + bcolors.ENDC + ': ' + bcolors.OKBLUE + saved_sources[i] + bcolors.ENDC)
             post_host(saved_sources[i])
+            comment_sublink(saved_sources[i])
 
     if option == 5 or option == 'all':
         print(bcolors.OKGREEN + 'Beginning TNS submissions...' + bcolors.ENDC)

@@ -166,7 +166,7 @@ def api(method, endpoint, data=None, params=None, timeout=10):
         except requests.exceptions.Timeout:
             print('Timeout Exception, restarting...')
             continue
-        except (json.decoder.JSONDecodeError, simplejson.errors.JSONDecodeError, requests.exceptions.SSLError):
+        except (json.decoder.JSONDecodeError, simplejson.errors.JSONDecodeError, requests.exceptions.SSLError, requests.exceptions.ConnectionError):
             #print('JSON Decode Error, restarting...')
             continue
 
@@ -250,7 +250,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
 
             comment = get_source_api(source)['comments'][i]['text']
 
-            if comment == 'Uploaded to TNS' and source != 'ZTF18adbbhww':
+            if comment == 'Uploaded to TNS':
                 print(ztfname + ' already uploaded to TNS.')
                 flag = 1
                 continue
@@ -1059,7 +1059,10 @@ def get_TNS_classification_ID(classification):
         "Computed-Ia": 1003, "Computed-IIP": 1011, "Computed-IIb": 1014, "Computed-PISN": 1020, "Computed-IIn": 1021}
 
     #keys = np.array(class_ids.keys())
-    return class_ids[classification]
+    try:
+        return class_ids[classification]
+    except KeyError:
+        return None
 
 def fritz_to_TNS_class(classification):
     object_types = {
@@ -1126,7 +1129,10 @@ def fritz_to_TNS_class(classification):
         "1020": "Computed-PISN",
         "1021": "Computed-IIn"}
 
-    return object_types[str(get_TNS_classification_ID(classification))]
+    try:
+        return object_types[str(get_TNS_classification_ID(classification))]
+    except KeyError:
+        return None
 
 def get_TNS_information(ztfname):
 
@@ -1185,10 +1191,21 @@ def get_IAUname(ztfname):
 
     while True:
 
-        response = requests.get(url, headers=headers)
+        try:
+            response = requests.get(url, headers=headers)
 
-        if response.status_code != 429:
+            if response.status_code != 429:
+                break
+
+        except requests.exceptions.ConnectionError:
+            continue
+
+        try:
+            json.loads(response.text)
             break
+
+        except json.decoder.JSONDecodeError:
+            continue
 
     if response.status_code != 404 and 'cross_matches' in json.loads(response.text)['data'].keys() and len(json.loads(response.text)['data']['cross_matches']['TNS']) != 0:
         return json.loads(response.text)['data']['cross_matches']['TNS'][0]['name']
@@ -1214,7 +1231,7 @@ def get_IAUname(ztfname):
             response_tns = requests.post('https://www.wis-tns.org/api/get/search', headers=headers, data=data)
         except requests.exceptions.ConnectionError:
             continue
-            
+
         if json.loads(response_tns.text)['id_code'] == 429:
             sleep(1)
         else:

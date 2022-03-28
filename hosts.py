@@ -288,3 +288,25 @@ def cross_ref_SDSS(ra, dec):
     name = 'SDSS ' + c.to_string('hmsdms', precision=2).replace('h', '').replace('m', '').replace('s', '').replace('d', '').replace(' ', '')
 
     return name, result_table['ra'][closest], result_table['dec'][closest], 'SDSS', None
+
+def comment_sublink(source):
+    comment_infos = get_source_api(source)['comments']
+
+    for i in range (len(comment_infos)):
+
+        comment_info = comment_infos[i]
+        comment = comment_info['text']
+
+        if 'Submit classification to TNS:' in comment:
+            print(source + ' already has TNS link.')
+            return
+
+    resp = post_comment(source, 'Submit classification to TNS: http://gayatri.caltech.edu:88/query/tns/'+source)
+
+    if resp['status'] == 'success':
+        print(bcolors.OKGREEN + source + ' TNS link upload successful.' + bcolors.ENDC)
+        return
+    else:
+        print(bcolors.FAIL + source + ' TNS link upload failed.' + bcolors.ENDC)
+        print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
+        return

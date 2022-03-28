@@ -23,6 +23,7 @@ from panoptes_client import Panoptes, Project, SubjectSet, Subject
 from astropy.io import ascii
 from astropy.table import QTable, Table
 from func import *
+from zooniverse import *
 
 # These numbers come from running model fits on ~500 Type Ia supernovae
 z = 0.060574239946858476
@@ -39,6 +40,8 @@ with open('info.info', 'r') as infofile:
     SNID_loc = info.split('\n')[0].split(':')[1].strip()
     zoo_user = info.split('\n')[5].split(':')[1].strip()
     zoo_pass = info.split('\n')[6].split(':')[1].strip()
+
+zoo = get_all_in_set()
 
 def get_peak_absmag(z, x0):
 
@@ -380,7 +383,8 @@ def snid_analyze(source):
     for i in sample_remaining:
         spectra_name = i["Version"].split(".")[0]
         z_snid = i["z_snid"]
-        plot_best_5(datasource,output,spectra_name,z_snid, top_5, show_redshift = False)
+        plot_best_5(datasource,output,spectra_name,z_snid, top_5, [sample_remaining['rlap_1'][0], sample_remaining['rlap_2'][0], sample_remaining['rlap_3'][0],
+            sample_remaining['rlap_4'][0], sample_remaining['rlap_5'][0]], show_redshift = False)
         gc.collect()
 
     try:
@@ -408,10 +412,7 @@ def snid_analyze(source):
             except ValueError:
                 return None, None, None, None
     else:
-        converters = {'ztfname': [ascii.convert_numpy(np.str)], 'date': [ascii.convert_numpy(np.str)]}
-        zoo = ascii.read('zooniverse.ascii', converters=converters)
-
-        if source in np.array(zoo['ztfname']):
+        if source in np.array(zoo):
             print(source + ' already submitted to Zooniverse within the last 6 months.')
             return None, None, None, None
 
@@ -486,7 +487,8 @@ def snid_analyze(source):
                     subject.add_location(ImageLoc + i["#Image3"])
                     subject.add_location(ImageLoc + i["#Image4"])
 
-                    subject.metadata.update({"!ZTF_Version": i["!ZTF_Version"], "!ZTF_Name": i["!ZTF_Name"], "z_snid": i["z_snid"], "z_snid_err": i["z_snid_err"]})
+                    subject.metadata.update({"!ZTF_Version": i["!ZTF_Version"], "!ZTF_Name": i["!ZTF_Name"], "z_snid": i["z_snid"], "z_snid_err": i["z_snid_err"],
+                        'rlaps': [sample_remaining['rlap_1'][0], sample_remaining['rlap_2'][0], sample_remaining['rlap_3'][0], sample_remaining['rlap_4'][0], sample_remaining['rlap_5'][0]]})
 
                     subject.save()
                     new_subjects.append(subject)
@@ -496,10 +498,6 @@ def snid_analyze(source):
             f.close()
 
             subject_set.add(new_subjects)
-
-            zoo.add_row([source, str(datetime.datetime.utcnow().date())])
-
-            ascii.write(zoo, 'zooniverse.ascii', overwrite=True)
 
             #plt.close('all')
             #print(os.listdir(os.getcwd()))
@@ -538,7 +536,7 @@ def plot_box_spec(wave, flux):
     return wv_plot, flux_plot
 
 def specplot(x,y,xi,yi,snid_type,fname,output,best_num, z_template, z_template_unc, z_snid,
-             spec_num, show_redshift=False):
+             spec_num, rlap, show_redshift=False):
     fig, ax = plt.subplots(figsize=(8,4.5))
     ax.plot(xi,yi,color='#32384D',alpha=0.5,
              label='New SN')
@@ -551,7 +549,7 @@ def specplot(x,y,xi,yi,snid_type,fname,output,best_num, z_template, z_template_u
                 va='center',
                 fontsize=15, transform=plt.gcf().transFigure)
     else:
-        ax.text(0.78, 0.955, 'Match #{}'.format(spec_num + 1),
+        ax.text(0.7, 0.955, 'Match #' + str(spec_num+1) + ', rlap=' + str(rlap),
                 va='center',
                 fontsize=15, transform=plt.gcf().transFigure)
 
@@ -572,8 +570,6 @@ def specplot(x,y,xi,yi,snid_type,fname,output,best_num, z_template, z_template_u
             color='#217CA3', weight='bold', va='center',
             fontsize=23, transform=plt.gcf().transFigure)
 
-
-
     ax.legend(fancybox=True)
     fig.subplots_adjust(left=0.055,right=0.99,top=0.925,bottom=0.145)
     fig.savefig(output + 'snidfits_emclip_' + fname + "_" + str(best_num) + '.png', dpi = 600)
@@ -581,7 +577,7 @@ def specplot(x,y,xi,yi,snid_type,fname,output,best_num, z_template, z_template_u
     plt.close(fig)
     plt.close()
 
-def plot_best_5(source, output, spectra_name, z_snid, top_5, show_redshift=False):
+def plot_best_5(source, output, spectra_name, z_snid, top_5, rlaps, show_redshift=False):
     source_folder = source + spectra_name
 
     files = np.sort(glob.glob(source_folder+"/*.dat"))
@@ -604,7 +600,7 @@ def plot_best_5(source, output, spectra_name, z_snid, top_5, show_redshift=False
         xi, yi = plot_box_spec(spectra["wavelength"], spectra["flux"])
         xi /= (1+z)
         x, y = i[1]["redshifted_wavelength"] / (1+z), i[1]["flux"]
-        specplot(x,y,xi,yi,snid_type,spectra_name,output,i[0][0], z, i[0][4], z_snid, spec_num, show_redshift=show_redshift)
+        specplot(x,y,xi,yi,snid_type,spectra_name,output,i[0][0], z, i[0][4], z_snid, spec_num, rlaps[spec_num], show_redshift=show_redshift)
 
 def submit_reds(no_reds, f):
 

@@ -22,7 +22,29 @@ sys.path.insert(1, superfit_loc)
 
 from superfit_func import *
 
+def get_all_in_set():
+    Panoptes.connect(username=zoo_user, password=zoo_pass)
+
+    project = Project.find(12959)
+
+    subject_set = SubjectSet()
+
+    subject_set.links.project = project
+    subject_set.display_name = 'Newly Unclassified'
+
+    subject_set = SubjectSet.find(99282)
+
+    news = []
+
+    for subject in subject_set.subjects:
+        news.append(subject.metadata['!ZTF_Name'])
+
+    return news
+
 def pull_class(startd):
+
+    if 'zooniverse' not in os.listdir(os.getcwd()):
+        os.mkdir('zooniverse')
 
     old_ims = os.listdir(os.getcwd() + '/zooniverse')
     for o in old_ims:
@@ -42,6 +64,7 @@ def pull_class(startd):
     news = []
     image_urls = []
     sub_ids = []
+    all_rlaps = []
 
     for subject in subject_set.subjects:
         if subject.subject_workflow_status(16969).retired_at == None:
@@ -51,6 +74,7 @@ def pull_class(startd):
             #print(subject.id)
             sub_ids.append(subject.id)
             news.append(subject.metadata['!ZTF_Name'])
+            all_rlaps.append(np.array(subject.metadata['rlaps']))
             #pprint(subject.locations)
             image_urls.append(subject.locations)
 
@@ -90,6 +114,7 @@ def pull_class(startd):
             if m > 0:
                 images_available = True
                 image_url = image_urls[int(np.argwhere(np.array(news) == new))][m-1]['image/png']
+                rlap = all_rlaps[int(np.argwhere(np.array(news) == new))][m-1]
                 img_data = requests.get(image_url).content
                 with open('zooniverse/' + new + '.png', 'wb') as handler:
                     handler.write(img_data)
@@ -127,9 +152,12 @@ def pull_class(startd):
             image = image.resize((width//5, height//5))
             image.show()
 
-            upload = input('Enter in the name of the best classification: ')
+            print('Template #' + str(m) + ' has rlap=' + str(rlap))
+            upload = input('Enter in the name of the best classification (or <n> for none): ')
 
-            if upload == 'II':
+            if upload == 'n':
+                continue
+            elif upload == 'II':
                 upload = 'Type II'
             elif upload == 'Gal':
                 upload = 'Galactic Nuclei'
