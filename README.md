@@ -32,7 +32,7 @@ Enter in the earliest date you want to check classifications or saves (YYYY-MM-D
 
 In most cases, you will want to look for newly classified or saved transients from the previous day, so entering `y` is generally acceptable (if more than one day since last running, such as Monday, enter in the date of last use). If for whatever reason you want to look at objects saved earlier, you can enter in this date in the appropriate format.
 
-### -1: Zooniverse Classifications
+### -1. Zooniverse Classifications
 
 The code will then ask whether you would like to pull classifications from Zooniverse. If you select yes, all objects with more than 11 classifications retired from the inputted date will be pulled. If those objects have a classification that a majority agree with, it will prompt the user to input the classification. **Enter it as it appears on the image displayed**. If it is a Type II, Superfit will run. If the identified type on Superfit agrees, the user will indicate that this is the case and the object will be formally classified on Fritz. If not, a comment will be submitted with this information.
 
