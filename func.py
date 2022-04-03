@@ -3,18 +3,18 @@ from __future__ import print_function
 import astropy.units as u
 import base64
 import datetime
-import json
+import json, simplejson
 import os, glob2
 import numpy as np
 import pandas as pd
 import pickle
 import pytz
 import re
-import requests, json, simplejson
+import requests
 import sys, getopt, argparse
+import warnings
 import webbrowser as wb
 import xlsxwriter
-import warnings
 
 from astropy import constants as const
 from astropy.cosmology import FlatLambdaCDM
@@ -206,29 +206,6 @@ def APO(specid):
     REDUCERS,e = d.split('\n', 1)
 
     return OBSDATE.split(' \n')[0], EXPTIME.split(' \n')[0], OBSERVERS.split(' \n')[0], REDUCERS
-
-def check_TNS_class(ztfname):
-
-    ''' Info : Checks TNS page for other classification reports
-        Input : ZTFname
-        Returns : Group that reported classification
-    '''
-
-    tns_name = get_IAUname(ztfname)[3:]
-    data = {'api_key' : API_KEY}
-    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
-    response = requests.get('https://www.wis-tns.org/object/'+tns_name, headers=headers, data=data)
-    class_data = response.text.split('Classification Reports', 2)[1]
-
-    if 'no-data' in class_data.split('class="clear"')[0]:
-        return None, None
-
-    class_info = class_data.split('class="odd"')[1]
-
-    print(ztfname + ' classified as ' + class_info.split('"cell-type">')[1].split('<')[0] + ' by ' + class_info.split('"cell-user_name">')[1].split('<')[0] + ' at ' +
-          class_info.split('"cell-time_received">')[1].split('<')[0] + '.')
-
-    return class_info.split('"cell-source_group_name">')[1].split('<')[0], class_info.split('"cell-type">')[1].split('<')[0]
 
 def class_submission(sources, tns_names, classifys, class_dates):
 
@@ -672,11 +649,129 @@ def class_submission(sources, tns_names, classifys, class_dates):
                             if tns_feedback(report_id) == True:
                                 post_comment(ztfname, 'Uploaded to TNS')
 
-def convert_to_jd(date):
+def check_TNS_class(ztfname):
 
-    d = Time(date, format='fits')
-    dat = d.jd
-    return dat
+    ''' Info : Checks TNS page for other classification reports
+        Input : ZTFname
+        Returns : Group that reported classification
+    '''
+
+    tns_name = get_IAUname(ztfname)[3:]
+    data = {'api_key' : API_KEY}
+    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
+    response = requests.get('https://www.wis-tns.org/object/'+tns_name, headers=headers, data=data)
+    class_data = response.text.split('Classification Reports', 2)[1]
+
+    if 'no-data' in class_data.split('class="clear"')[0]:
+        return None, None
+
+    class_info = class_data.split('class="odd"')[1]
+
+    print(ztfname + ' classified as ' + class_info.split('"cell-type">')[1].split('<')[0] + ' by ' + class_info.split('"cell-user_name">')[1].split('<')[0] + ' at ' +
+          class_info.split('"cell-time_received">')[1].split('<')[0] + '.')
+
+    return class_info.split('"cell-source_group_name">')[1].split('<')[0], class_info.split('"cell-type">')[1].split('<')[0]
+
+def edit_comment(ztfname, comment_id, author_id, text, attach=None, attach_name=None):
+
+    ''' Info : Posts a comment on transient's Fritz page
+        Input : ZTFname, text
+        Returns : API response
+    '''
+
+    data = {  "obj_id": ztfname,
+              "text": text,
+              'author_id': author_id
+           }
+
+    if attach != None:
+        with open(attach, "rb") as img_file:
+            at_str = base64.b64encode(img_file.read()).decode('utf-8')
+
+        data['attachment_name'] = attach_name
+        data['attachment_bytes'] = at_str
+
+    url = BASEURL+'api/sources/'+ztfname+'/comments/'+str(comment_id)
+
+    response = api('PUT', url, data=data)
+
+    return response
+
+def fritz_to_TNS_class(classification):
+
+    ''' Info : Converts Fritz classification name to TNS classification name (e.g. 'Ia' --> 'SN Ia')
+        Input : Fritz classification
+        Returns : TNS classification
+    '''
+
+    object_types = {
+        "0": "Other",
+        "1": "SN",
+        "2": "SN I",
+        "3": "SN Ia",
+        "4": "SN Ib",
+        "5": "SN Ic",
+        "6": "SN Ib/c",
+        "7": "SN Ic-BL",
+        "8": "SN Ib-Ca-rich",
+        "9": "SN Ibn",
+        "10": "SN II",
+        "11": "SN IIP",
+        "12": "SN IIL",
+        "13": "SN IIn",
+        "14": "SN IIb",
+        "15": "SN I-faint",
+        "16": "SN I-rapid",
+        "18": "SLSN-I",
+        "19": "SLSN-II",
+        "20": "SLSN-R",
+        "23": "Afterglow",
+        "24": "LBV",
+        "25": "ILRT",
+        "26": "Nova",
+        "27": "CV",
+        "28": "Varstar",
+        "29": "AGN",
+        "30": "Galaxy",
+        "31": "QSO",
+        "40": "Light-Echo",
+        "50": "Std-spec",
+        "60": "Gap",
+        "61": "Gap I",
+        "62": "Gap II",
+        "65": "LRN",
+        "66": "FBOT",
+        "70": "Kilonova",
+        "99": "Impostor-SN",
+        "100": "SN Ia-pec",
+        "102": "SN Ia-SC",
+        "103": "SN Ia-91bg-like",
+        "104": "SN Ia-91T-like",
+        "105": "SN Iax[02cx-like]",
+        "106": "SN Ia-CSM",
+        "107": "SN Ib-pec",
+        "108": "SN Ic-pec",
+        "109": "SN Icn",
+        "110": "SN Ibn/Icn",
+        "111": "SN II-pec",
+        "112": "SN IIn-pec",
+        "120": "TDE",
+        "130": "FRB",
+        "200": "WR",
+        "201": "WR-WN",
+        "202": "WR-WC",
+        "203": "WR-WO",
+        "210": "M dwarf",
+        "1003": "Computed-Ia",
+        "1011": "Computed-IIP",
+        "1014": "Computed-IIb",
+        "1020": "Computed-PISN",
+        "1021": "Computed-IIn"}
+
+    try:
+        return object_types[str(get_TNS_classification_ID(classification))]
+    except KeyError:
+        return None
 
 def get_all_spectra_id(ztfname):
     ''' Info : Query all spectra corresponding to a source, takes input ZTF name
@@ -701,36 +796,7 @@ def get_all_spectra_len(ztfname):
     response = api('GET',url)
     return len(response['data']['spectra'])
 
-def get_classi(ztfname):
-
-    ''' Info : Query the classification and classification date for any source
-        Input : ZTFname
-        Returns : Classification and Classification date
-        Comment : You need to choose the classification if there are multiple classifications
-    '''
-
-    try:
-
-        url = BASEURL+'api/sources/'+ztfname+'/classifications'
-        response = api('GET',url)
-        output = response['data']
-
-        if (len(output)< 1):
-            classification = "Not Classified"
-            classification_date = "None"
-
-        if (len(output) >= 1):
-
-            classification = response['data'][(len(output)-1)]['classification']
-            classification_date = response['data'][(len(output)-1)]['created_at']
-
-    except KeyError as e:
-        classification = "Error"
-        classification_date = "Error"
-
-    return classification, classification_date
-
-def get_classification(ztfname):
+def get_classification(ztfname, man=False):
 
     ''' Info : Query the classification and classification date for any source
         Input : ZTFname
@@ -747,28 +813,37 @@ def get_classification(ztfname):
         probability = "None"
         classification_date = "None"
 
-    if (len(output)==1):
+    elif (len(output)==1):
 
         classification = response['data'][0]['classification']
         probability = response['data'][0]['probability']
         classification_date = response['data'][0]['created_at'].split('T')[0]
 
-        if (probability <= 0.6):
+        if man == True:
 
-            print ("Low probability, do you want to proceed with the classification?\a")
+            if (probability <= 0.6):
 
-            user_input = input("y/n: ")
+                print ("Low probability, do you want to proceed with the classification?\a")
 
-            if user_input == 'y':
+                user_input = input("y/n: ")
 
-                classification = classification
-                probability =  probability
-                classification_date = classification_date
+                if user_input == 'y':
 
-    if (len(output) > 1):
+                    classification = classification
+                    probability =  probability
+                    classification_date = classification_date
+
+        else:
+
+            classification = classification
+            probability =  probability
+            classification_date = classification_date
+
+    elif (len(output) > 1):
 
         classification = []
         classification_date = []
+        classification_mjd = []
         probability = []
 
         for i in range (len(output)):
@@ -780,48 +855,103 @@ def get_classification(ztfname):
             classification.append(classify)
             probability=np.append(probability, prob)
             classification_date.append(classify_date)
+            classification_mjd.append(Time(classify_date, format='isot', scale='utc').mjd)
 
-        for i in range (len(classification)):
+        if man == True:
 
-            print ((i+1),")", "Classification: ", classification[i],  "\t Probability:", str(probability[i]), "\t Classification date:", classification_date[i].split('T')[0])
+            for i in range (len(classification)):
 
-        user_input = input("Choose classification: \a")
+                print ((i+1),")", "Classification: ", classification[i],  "\t Probability:", str(probability[i]), "\t Classification date:", classification_date[i].split('T')[0])
 
-        if (probability[int(user_input)-1] <= 0.6):
+            user_input = input("Choose classification: \a")
 
-            print ("Low probability, do you want to proceed with the classification?\a")
+            if (probability[int(user_input)-1] <= 0.6):
 
-            user_choice = input("y/n: ")
+                print ("Low probability, do you want to proceed with the classification?\a")
 
-            if user_choice == 'y':
+                user_choice = input("y/n: ")
+
+                if user_choice == 'y':
+
+                    classification = classification[int(user_input)-1]
+                    probability = probability[int(user_input)-1]
+                    classification_date = classification_date[int(user_input)-1].split('T')[0]
+            else:
 
                 classification = classification[int(user_input)-1]
                 probability = probability[int(user_input)-1]
                 classification_date = classification_date[int(user_input)-1].split('T')[0]
+
         else:
 
-            classification = classification[int(user_input)-1]
-            probability = probability[int(user_input)-1]
-            classification_date = classification_date[int(user_input)-1].split('T')[0]
+            classification = classification[np.argmax(classification_mjd)]
+            probability = probability[np.argmax(classification_mjd)]
+            classification_date = classification_date[np.argmax(classification_mjd)].split('T')[0]
 
     return classification, probability, classification_date
 
-def get_group_ids(groupnames=['Redshift Completeness Factor', 'Census of the Local Universe Caltech']):
-    ''' Info : Query group ids of groups specified
-        Input : Name or names of groups in an array []
-        Returns : List of group  names and their group ids
+def get_IAUname(ztfname):
+
+    ''' Info : Query the TNS name for any source
+        Input : ZTFname
+        Returns : ATname
     '''
 
-    url = BASEURL+'api/groups'
+    url = 'https://fritz.science/api/alerts_aux/'+ztfname
     headers = {'Authorization': f'token {GETTOKEN}'}
-    groupnames = np.atleast_1d(groupnames)
-    grpids = []
-    for grpname in groupnames:
-        response = requests.request('GET',url,params={'name':grpname}, headers=headers).json()
-        answer = str(grpname)+' = '+str(response['data'][0]['id'])
-        grpids.append(answer)
 
-    return grpids
+    while True:
+
+        try:
+            response = requests.get(url, headers=headers)
+
+            if response.status_code != 429:
+                break
+
+        except requests.exceptions.ConnectionError:
+            continue
+
+        try:
+            json.loads(response.text)
+            break
+
+        except json.decoder.JSONDecodeError:
+            continue
+
+    if response.status_code != 404 and 'cross_matches' in json.loads(response.text)['data'].keys() and len(json.loads(response.text)['data']['cross_matches']['TNS']) != 0:
+        return json.loads(response.text)['data']['cross_matches']['TNS'][0]['name']
+
+    req_data = {
+        "ra": "",
+        "dec": "",
+        "radius": "",
+        "units": "",
+        "objname": "",
+        "objname_exact_match": 0,
+        "internal_name": ztfname.replace('_', ' '),
+        "internal_name_exact_match": 0,
+        "objid": ""
+    }
+
+    data = {'api_key' : API_KEY, 'data' : json.dumps(req_data)}
+    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
+    #pprint(headers)
+
+    while True:
+        try:
+            response_tns = requests.post('https://www.wis-tns.org/api/get/search', headers=headers, data=data)
+        except requests.exceptions.ConnectionError:
+            continue
+
+        if json.loads(response_tns.text)['id_code'] == 429:
+            sleep(1)
+        else:
+            break
+
+    if len(json.loads(response_tns.text)['data']['reply']) != 0:
+        return json.loads(response_tns.text)['data']['reply'][0]['prefix'] + ' ' + json.loads(response_tns.text)['data']['reply'][0]['objname']
+
+    return 'Not reported to TNS'
 
 def get_number(group_id, date):
     ''' Info : Query number of sources saved in a group after a certain date
@@ -1064,106 +1194,6 @@ def get_TNS_classification_ID(classification):
     except KeyError:
         return None
 
-def fritz_to_TNS_class(classification):
-    object_types = {
-        "0": "Other",
-        "1": "SN",
-        "2": "SN I",
-        "3": "SN Ia",
-        "4": "SN Ib",
-        "5": "SN Ic",
-        "6": "SN Ib/c",
-        "7": "SN Ic-BL",
-        "8": "SN Ib-Ca-rich",
-        "9": "SN Ibn",
-        "10": "SN II",
-        "11": "SN IIP",
-        "12": "SN IIL",
-        "13": "SN IIn",
-        "14": "SN IIb",
-        "15": "SN I-faint",
-        "16": "SN I-rapid",
-        "18": "SLSN-I",
-        "19": "SLSN-II",
-        "20": "SLSN-R",
-        "23": "Afterglow",
-        "24": "LBV",
-        "25": "ILRT",
-        "26": "Nova",
-        "27": "CV",
-        "28": "Varstar",
-        "29": "AGN",
-        "30": "Galaxy",
-        "31": "QSO",
-        "40": "Light-Echo",
-        "50": "Std-spec",
-        "60": "Gap",
-        "61": "Gap I",
-        "62": "Gap II",
-        "65": "LRN",
-        "66": "FBOT",
-        "70": "Kilonova",
-        "99": "Impostor-SN",
-        "100": "SN Ia-pec",
-        "102": "SN Ia-SC",
-        "103": "SN Ia-91bg-like",
-        "104": "SN Ia-91T-like",
-        "105": "SN Iax[02cx-like]",
-        "106": "SN Ia-CSM",
-        "107": "SN Ib-pec",
-        "108": "SN Ic-pec",
-        "109": "SN Icn",
-        "110": "SN Ibn/Icn",
-        "111": "SN II-pec",
-        "112": "SN IIn-pec",
-        "120": "TDE",
-        "130": "FRB",
-        "200": "WR",
-        "201": "WR-WN",
-        "202": "WR-WC",
-        "203": "WR-WO",
-        "210": "M dwarf",
-        "1003": "Computed-Ia",
-        "1011": "Computed-IIP",
-        "1014": "Computed-IIb",
-        "1020": "Computed-PISN",
-        "1021": "Computed-IIn"}
-
-    try:
-        return object_types[str(get_TNS_classification_ID(classification))]
-    except KeyError:
-        return None
-
-def get_TNS_information(ztfname):
-
-    ''' Info : Retrieves relevant info for submission to TNS from Fritz (IAU name, classification, redshift)
-        Input : ZTFname
-        Returns : ZTFname (redundant), IAU name, classification, redshift
-    '''
-
-    url = BASEURL+'api/sources/'+ztfname
-    response = api('GET',url)
-
-    IAU = get_IAUname(ztfname)
-
-    clas = get_classification(ztfname)
-
-    if clas[1] == 'None':
-        clas = "Not classified yet"
-
-    else:
-        clas = ('Classification: '+str(clas[0])+','+ ' Probability: '+str(clas[1])+','+' Classification date: '+str(clas[2]))
-
-    redshift = get_redshift(ztfname)
-
-    if redshift == None:
-        redshift = "No redshift found"
-
-    else:
-        redshift = ('redshift:'+str(redshift))
-
-    return ztfname, IAU, clas, redshift
-
 def get_TNS_instrument_ID(inst):
 
     ''' Info : Retrieves the TNS instrument ID based on Fritz instrument
@@ -1179,72 +1209,9 @@ def get_TNS_instrument_ID(inst):
             instkey = inst_ids[keys]
             return instkey
 
-def get_IAUname(ztfname):
-
-    ''' Info : Query the TNS name for any source
-        Input : ZTFname
-        Returns : ATname
-    '''
-
-    url = 'https://fritz.science/api/alerts_aux/'+ztfname
-    headers = {'Authorization': f'token {GETTOKEN}'}
-
-    while True:
-
-        try:
-            response = requests.get(url, headers=headers)
-
-            if response.status_code != 429:
-                break
-
-        except requests.exceptions.ConnectionError:
-            continue
-
-        try:
-            json.loads(response.text)
-            break
-
-        except json.decoder.JSONDecodeError:
-            continue
-
-    if response.status_code != 404 and 'cross_matches' in json.loads(response.text)['data'].keys() and len(json.loads(response.text)['data']['cross_matches']['TNS']) != 0:
-        return json.loads(response.text)['data']['cross_matches']['TNS'][0]['name']
-
-    req_data = {
-        "ra": "",
-        "dec": "",
-        "radius": "",
-        "units": "",
-        "objname": "",
-        "objname_exact_match": 0,
-        "internal_name": ztfname.replace('_', ' '),
-        "internal_name_exact_match": 0,
-        "objid": ""
-    }
-
-    data = {'api_key' : API_KEY, 'data' : json.dumps(req_data)}
-    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
-    #pprint(headers)
-
-    while True:
-        try:
-            response_tns = requests.post('https://www.wis-tns.org/api/get/search', headers=headers, data=data)
-        except requests.exceptions.ConnectionError:
-            continue
-
-        if json.loads(response_tns.text)['id_code'] == 429:
-            sleep(1)
-        else:
-            break
-
-    if len(json.loads(response_tns.text)['data']['reply']) != 0:
-        return json.loads(response_tns.text)['data']['reply'][0]['prefix'] + ' ' + json.loads(response_tns.text)['data']['reply'][0]['objname']
-
-    return 'Not reported to TNS'
-
 def get_total_number_of_sources(group_id):
     ''' Info : Query total number of sources saved in a group
-        Input : group id
+        Input : Group ID
         Returns : Total number of sources saved in a group
     '''
 
@@ -1252,10 +1219,263 @@ def get_total_number_of_sources(group_id):
     response = api('GET',url)
     return len(response['data']['sources'])
 
-def get_user(fritz_id):
-    resp = api('GET', BASEURL+'api/user/'+str(fritz_id))
+def post_comment(ztfname, text, attach=None, attach_name=None):
 
-    return resp['data']['username']
+    ''' Info : Posts a comment on transient's Fritz page
+        Input : ZTFname, text
+        Returns : API response
+    '''
+
+    data = {
+            "text": text,
+           }
+
+    if attach != None:
+        with open(attach, "rb") as img_file:
+            at_str = base64.b64encode(img_file.read()).decode('utf-8')
+
+        data['attachment'] = {'body': at_str, 'name': attach_name}
+
+    url = BASEURL+'api/sources/'+ztfname+'/comments'
+
+    response = api('POST', url, data=data)
+
+    return response
+
+def pprint(*args, **kwargs):
+    """
+    slightly more convenient function instead of print(get_pprint)
+
+    params:
+        *args (arguments to pass to get_pprint)
+        **kwargs (keyword arguments to pass to get_pprint)
+    """
+    print(get_pprint(*args, **kwargs))
+
+def read_ascii(f, startd):
+
+    ''' Info : Reads ASCII table for classified or saved transients passed specified date
+        Input : ASCII table, earliest date to filter
+        Returns : sources (ZTF names), dates saved, classifications, classification dates, unclassified transients, redshifts
+    '''
+
+    sources_r = np.asarray(f['Source Name'])
+    tns_names_r = np.asarray(f['TNS Name'])
+    savedates_r = np.asarray(f['Saved Date'])
+    classifys_r = np.asarray(f['Classification'])
+    class_dates_r = np.asarray(f['Classification Date'])
+    reds_r = np.asarray(f['redshift'])
+
+    sources = np.array([])
+    tns_names = np.array([])
+    savedates = np.array([])
+    classifys = np.array([])
+    class_dates = np.array([])
+    reds = np.array([])
+    unclassifys = np.array([])
+
+    for i in np.arange(0,len(sources_r)):
+        if classifys_r[i] != 'No Classification found' and (datetime.datetime.strptime(class_dates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd or datetime.datetime.strptime(savedates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd):
+            sources = np.append(sources, sources_r[i])
+            tns_names = np.append(tns_names, tns_names_r[i])
+            savedates = np.append(savedates, savedates_r[i])
+            classifys = np.append(classifys, classifys_r[i])
+            class_dates = np.append(class_dates, class_dates_r[i])
+            reds = np.append(reds, str(reds_r[i]))
+        if classifys_r[i] == 'No Classification found' and datetime.datetime.strptime(savedates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd:
+            unclassifys = np.append(unclassifys, sources_r[i])
+
+    return sources, tns_names, savedates, classifys, class_dates, reds, unclassifys
+
+def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - datetime.timedelta(days=180))):
+
+    ''' Info : Downloads list of transients on Fritz saved after specified date (or since 180 days prior if no input)
+               Saves ZTF names, TNS names, dates saved, classifications, classifications, redshifts as ASCII file
+        Input : outfile name, date to check after
+        Returns : None
+    '''
+
+    #print('data received')
+
+    srcs = []
+    dates = []
+    classify = []
+    class_date = []
+    TNS = []
+    reds = []
+
+    listdir = os.getcwd()
+    f = open (listdir+'/'+outfile+'.ascii','w')
+    f.write('Source Name'+'\t'+'TNS Name'+'\t'+'Saved Date'+'\t'+'Classification'+'\t'+'Classification Date'+'\t'+'redshift'+'\n')
+
+    groupnum = input('Enter in Group ID: ')
+
+    num_tot = get_number(groupnum, dat)
+    #print(num_tot)
+
+    num_pages = int(num_tot/500) + 1
+    #print(num_pages)
+
+    for page in range(num_pages):
+
+        path = 'https://fritz.science/api/sources?group_ids=' + groupnum + '&saveSummary=true&numPerPage=500&pageNumber='+str(page+1)+'&savedAfter='+str(dat)+'T00:00:00.000001'
+
+        #print(path)
+
+        response = api('GET',path)
+
+        if len(response['data']['sources']) == 0:
+            break
+
+        for i in tqdm(range(len(response['data']['sources'])), desc='Page ' + str(page+1) + ' of ' + str(num_pages)):
+
+            source_name = response['data']['sources'][i]['obj_id']
+            saved_date = response['data']['sources'][i]['saved_at']
+            classification, prob, date = get_classification(source_name)
+            IAU = get_IAUname(source_name)
+            red = str(get_redshift(source_name))
+
+            #print (i, source_name)
+
+            srcs.append(source_name)
+            TNS.append(IAU)
+            dates.append(saved_date.split('T')[0])
+            classify.append(classification)
+            class_date.append(date.split('T')[0])
+            reds.append(red)
+
+    output = sorted(zip(class_date, srcs, TNS, dates, classify, reds), reverse=True)
+
+    for i in range(num_tot):
+
+        f.write(output[i][1]+'\t'+output[i][2]+'\t'+output[i][3]+'\t'+output[i][4]+'\t'+output[i][0]+'\t'+output[i][5]+'\n')
+
+    f.close()
+
+def submit_fritz_class(ztfname, clas):
+
+    ''' Info : Uploads classification to Fritz
+        Input : ZTFname, classification
+        Returns : API response
+    '''
+
+    data = {    "obj_id": ztfname,
+                "classification": clas,
+                "taxonomy_id": 3,
+                "probability": 1}
+
+    url = BASEURL+'api/classification'
+
+    response = api('POST', url, data=data)
+
+    return response
+
+def submit_fritz_redshift(ztfname, redshift,redshift_err):
+
+    ''' Info : Uploads redshift to Fritz
+        Input : ZTFname, redshift
+        Returns : API response
+    '''
+
+    data = {    "redshift": redshift,
+                "redshift_error": redshift_err}
+
+    url = BASEURL+'api/sources/'+ztfname
+
+    response = api('PATCH', url, data=data)
+
+    return response
+
+def tns_classify(classificationReport, base_url= report_url, api_key=API_KEY):
+
+    ''' Info : Uploads classification report to TNS
+        Input : classification report, transient URL on TNS, API KEY
+        Returns : API response
+    '''
+
+    url = base_url
+
+    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
+
+    data = {'api_key' : api_key, 'data' : classificationReport.as_json()}
+    response = requests.post(url, headers=headers, data=data).json()
+    if not response:
+        return False
+
+    res_code = response['id_code']
+    report_id = response['data']['report_id']
+    print("ID:", report_id)
+    print(str(res_code) + ' ' + response['id_message'] + ' ' + "reporting finished")
+    if res_code == 200:
+        return report_id
+    else:
+        print("Result reporting didn't work")
+        pprint(response)
+        print("re-submit classification, but don't re-upload files")
+        return False
+
+def tns_feedback(report_id):
+
+    ''' Info : Verifies that report has been uploaded
+        Input : ID of report
+        Returns : API response
+    '''
+
+    data = {'api_key': API_KEY, 'report_id': report_id}
+
+    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
+
+    response = requests.post(reply_url, headers=headers, data=data).json()
+
+    feedback_code = response['id_code']
+    print(feedback_code, response['id_message'], "feedback finished")
+    if feedback_code == 200:
+        print(bcolors.OKGREEN + 'Feedback successful. Continuing...' + bcolors.ENDC)
+        return True
+    elif feedback_code == 404:
+        print(bcolors.WARNING + "Waiting and retrying..." + bcolors.ENDC)
+        sleep(2)
+        try:
+            return tns_feedback(report_id)
+        except KeyboardInterrupt:
+            return False
+    elif feedback_code == 400:
+        print(bcolors.FAIL + json.dumps(response, indent=2) + bcolors.ENDC)
+        return False
+    else:
+        # error receiving the feedback from TNS about the upload
+        print("Something went wrong with the feedback, but the report may",
+              "still have been fine?")
+        return False
+
+def upload_to_TNS(filename, base_url = upload_url, api_key = API_KEY, filetype='ascii'):
+
+    ''' Info : Uploads spectrum to TNS
+        Input : spectrum file name, transient URL on TNS, API KEY, spectrum file type
+        Returns : API response
+    '''
+
+    url = base_url
+    data = {'api_key' : api_key}
+
+    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
+
+    if filetype == 'ascii':
+        files = [('files[]', (filename, open(filename), 'text/plain'))]
+
+    elif filetype == 'fits':
+        files = [('files[0]', (filename, open(filename, 'rb'),
+                               'application/fits'))]
+
+    if filename:
+        response = requests.post(url, headers=headers, data=data, files=files)
+        try:
+            return response.json()
+        except:
+            print(url, data, files, response.content, sep='\n')
+            return False
+    else:
+        return {}
 
 def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
 
@@ -1449,287 +1669,3 @@ def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
         spectrum_name = None
 
     return spectrum_name, specid
-
-def post_comment(ztfname, text, attach=None, attach_name=None):
-
-    ''' Info : Posts a comment on transient's Fritz page
-        Input : ZTFname, text
-        Returns : API response
-    '''
-
-    data = {
-            "text": text,
-           }
-
-    if attach != None:
-        with open(attach, "rb") as img_file:
-            at_str = base64.b64encode(img_file.read()).decode('utf-8')
-
-        data['attachment'] = {'body': at_str, 'name': attach_name}
-
-    url = BASEURL+'api/sources/'+ztfname+'/comments'
-
-    response = api('POST', url, data=data)
-
-    return response
-
-def edit_comment(ztfname, comment_id, author_id, text, attach=None, attach_name=None):
-
-    ''' Info : Posts a comment on transient's Fritz page
-        Input : ZTFname, text
-        Returns : API response
-    '''
-
-    data = {  "obj_id": ztfname,
-              "text": text,
-              'author_id': author_id
-           }
-
-    if attach != None:
-        with open(attach, "rb") as img_file:
-            at_str = base64.b64encode(img_file.read()).decode('utf-8')
-
-        data['attachment_name'] = attach_name
-        data['attachment_bytes'] = at_str
-
-    url = BASEURL+'api/sources/'+ztfname+'/comments/'+str(comment_id)
-
-    response = api('PUT', url, data=data)
-
-    return response
-
-def pprint(*args, **kwargs):
-    """
-    slightly more convenient function instead of print(get_pprint)
-
-    params:
-        *args (arguments to pass to get_pprint)
-        **kwargs (keyword arguments to pass to get_pprint)
-    """
-    print(get_pprint(*args, **kwargs))
-
-def read_ascii(f, startd):
-
-    ''' Info : Reads ASCII table for classified or saved transients passed specified date
-        Input : ASCII table, earliest date to filter
-        Returns : sources (ZTF names), dates saved, classifications, classification dates, unclassified transients, redshifts
-    '''
-
-    sources_r = np.asarray(f['Source Name'])
-    tns_names_r = np.asarray(f['TNS Name'])
-    savedates_r = np.asarray(f['Saved Date'])
-    classifys_r = np.asarray(f['Classification'])
-    class_dates_r = np.asarray(f['Classification Date'])
-    reds_r = np.asarray(f['redshift'])
-
-    sources = np.array([])
-    tns_names = np.array([])
-    savedates = np.array([])
-    classifys = np.array([])
-    class_dates = np.array([])
-    reds = np.array([])
-    unclassifys = np.array([])
-
-    for i in np.arange(0,len(sources_r)):
-        if classifys_r[i] != 'Not Classified' and (datetime.datetime.strptime(class_dates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd or datetime.datetime.strptime(savedates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd):
-            sources = np.append(sources, sources_r[i])
-            tns_names = np.append(tns_names, tns_names_r[i])
-            savedates = np.append(savedates, savedates_r[i])
-            classifys = np.append(classifys, classifys_r[i])
-            class_dates = np.append(class_dates, class_dates_r[i])
-            reds = np.append(reds, str(reds_r[i]))
-        if classifys_r[i] == 'Not Classified' and datetime.datetime.strptime(savedates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd:
-            unclassifys = np.append(unclassifys, sources_r[i])
-
-    return sources, tns_names, savedates, classifys, class_dates, reds, unclassifys
-
-def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - datetime.timedelta(days=180))):
-
-    ''' Info : Downloads list of transients on Fritz saved after specified date (or since 180 days prior if no input)
-               Saves ZTF names, TNS names, dates saved, classifications, classifications, redshifts as ASCII file
-        Input : outfile name, date to check after
-        Returns : None
-    '''
-
-    #print('data received')
-
-    srcs = []
-    dates = []
-    classify = []
-    class_date = []
-    TNS = []
-    reds = []
-
-    listdir = os.getcwd()
-    f = open (listdir+'/'+outfile+'.ascii','w')
-    f.write('Source Name'+'\t'+'TNS Name'+'\t'+'Saved Date'+'\t'+'Classification'+'\t'+'Classification Date'+'\t'+'redshift'+'\n')
-
-    groupnum = input('Enter in Group ID: ')
-
-    num_tot = get_number(groupnum, dat)
-    #print(num_tot)
-
-    num_pages = int(num_tot/500) + 1
-    #print(num_pages)
-
-    for page in range(num_pages):
-
-        path = 'https://fritz.science/api/sources?group_ids=' + groupnum + '&saveSummary=true&numPerPage=500&pageNumber='+str(page+1)+'&savedAfter='+str(dat)+'T00:00:00.000001'
-
-        #print(path)
-
-        response = api('GET',path)
-
-        if len(response['data']['sources']) == 0:
-            break
-
-        for i in tqdm(range(len(response['data']['sources'])), desc='Page ' + str(page+1) + ' of ' + str(num_pages)):
-
-            source_name = response['data']['sources'][i]['obj_id']
-            saved_date = response['data']['sources'][i]['saved_at']
-            classification = get_classi(source_name)[0]
-            date = get_classi(source_name)[1]
-            IAU = get_IAUname(source_name)
-            red = str(get_redshift(source_name))
-
-            #print (i, source_name)
-
-            srcs.append(source_name)
-            TNS.append(IAU)
-            dates.append(saved_date.split('T')[0])
-            classify.append(classification)
-            class_date.append(date.split('T')[0])
-            reds.append(red)
-
-    output = sorted(zip(class_date, srcs, TNS, dates, classify, reds), reverse=True)
-
-    for i in range(num_tot):
-
-        f.write(output[i][1]+'\t'+output[i][2]+'\t'+output[i][3]+'\t'+output[i][4]+'\t'+output[i][0]+'\t'+output[i][5]+'\n')
-
-    f.close()
-
-def submit_fritz_class(ztfname, clas):
-
-    ''' Info : Uploads classification to Fritz
-        Input : ZTFname, classification
-        Returns : API response
-    '''
-
-    data = {    "obj_id": ztfname,
-                "classification": clas,
-                "taxonomy_id": 3,
-                "probability": 1}
-
-    url = BASEURL+'api/classification'
-
-    response = api('POST', url, data=data)
-
-    return response
-
-def submit_fritz_redshift(ztfname, redshift,redshift_err):
-
-    ''' Info : Uploads redshift to Fritz
-        Input : ZTFname, redshift
-        Returns : API response
-    '''
-
-    data = {    "redshift": redshift,
-                "redshift_error": redshift_err}
-
-    url = BASEURL+'api/sources/'+ztfname
-
-    response = api('PATCH', url, data=data)
-
-    return response
-
-def tns_classify(classificationReport, base_url= report_url, api_key=API_KEY):
-
-    ''' Info : Uploads classification report to TNS
-        Input : classification report, transient URL on TNS, API KEY
-        Returns : API response
-    '''
-
-    url = base_url
-
-    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
-
-    data = {'api_key' : api_key, 'data' : classificationReport.as_json()}
-    response = requests.post(url, headers=headers, data=data).json()
-    if not response:
-        return False
-
-    res_code = response['id_code']
-    report_id = response['data']['report_id']
-    print("ID:", report_id)
-    print(str(res_code) + ' ' + response['id_message'] + ' ' + "reporting finished")
-    if res_code == 200:
-        return report_id
-    else:
-        print("Result reporting didn't work")
-        pprint(response)
-        print("re-submit classification, but don't re-upload files")
-        return False
-
-def tns_feedback(report_id):
-
-    ''' Info : Verifies that report has been uploaded
-        Input : ID of report
-        Returns : API response
-    '''
-
-    data = {'api_key': API_KEY, 'report_id': report_id}
-
-    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
-
-    response = requests.post(reply_url, headers=headers, data=data).json()
-
-    feedback_code = response['id_code']
-    print(feedback_code, response['id_message'], "feedback finished")
-    if feedback_code == 200:
-        print(bcolors.OKGREEN + 'Feedback successful. Continuing...' + bcolors.ENDC)
-        return True
-    elif feedback_code == 404:
-        print(bcolors.WARNING + "Waiting and retrying..." + bcolors.ENDC)
-        sleep(2)
-        try:
-            return tns_feedback(report_id)
-        except KeyboardInterrupt:
-            return False
-    elif feedback_code == 400:
-        print(bcolors.FAIL + json.dumps(response, indent=2) + bcolors.ENDC)
-        return False
-    else:
-        # error receiving the feedback from TNS about the upload
-        print("Something went wrong with the feedback, but the report may",
-              "still have been fine?")
-        return False
-
-def upload_to_TNS(filename, base_url = upload_url, api_key = API_KEY, filetype='ascii'):
-
-    ''' Info : Uploads spectrum to TNS
-        Input : spectrum file name, transient URL on TNS, API KEY, spectrum file type
-        Returns : API response
-    '''
-
-    url = base_url
-    data = {'api_key' : api_key}
-
-    headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
-
-    if filetype == 'ascii':
-        files = [('files[]', (filename, open(filename), 'text/plain'))]
-
-    elif filetype == 'fits':
-        files = [('files[0]', (filename, open(filename, 'rb'),
-                               'application/fits'))]
-
-    if filename:
-        response = requests.post(url, headers=headers, data=data, files=files)
-        try:
-            return response.json()
-        except:
-            print(url, data, files, response.content, sep='\n')
-            return False
-    else:
-        return {}

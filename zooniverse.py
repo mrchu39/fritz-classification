@@ -1,16 +1,18 @@
-from panoptes_client import Panoptes, Project, SubjectSet, Subject, Classification, Workflow
 import csv
-import json
 import datetime
-import sys
+import json
 import os
 import numpy as np
-from scipy import stats
 import requests
-from PIL import Image
-from func import *
-from pprint import pprint
+import sys
 import time
+
+from PIL import Image
+from panoptes_client import Panoptes, Project, SubjectSet, Subject, Classification, Workflow
+from pprint import pprint
+from scipy import stats
+
+from func import *
 
 with open('info.info', 'r') as infofile:
     info = infofile.read()
@@ -23,6 +25,12 @@ sys.path.insert(1, superfit_loc)
 from superfit_func import *
 
 def get_all_in_set():
+
+    ''' Info : Grabs all sources uploaded to the 'Newly Unclassified' subject set on Zooniverse
+        Input: None
+        Returns: List of ZTF names
+    '''
+
     Panoptes.connect(username=zoo_user, password=zoo_pass)
 
     project = Project.find(12959)
@@ -42,6 +50,11 @@ def get_all_in_set():
     return news
 
 def pull_class(startd):
+
+    ''' Info : Retrieves classifications from Zooniverse and (if Type II) uploads it to Fritz if of acceptable quality and matching Superfit classification
+        Input : Earliest date to retrieve retired objects
+        Returns : None
+    '''
 
     if 'zooniverse' not in os.listdir(os.getcwd()):
         os.mkdir('zooniverse')
@@ -66,16 +79,15 @@ def pull_class(startd):
     sub_ids = []
     all_rlaps = []
 
+    # Retrieve all retired objects after startd
     for subject in subject_set.subjects:
         if subject.subject_workflow_status(16969).retired_at == None:
             continue
 
         if datetime.datetime.strptime(subject.subject_workflow_status(16969).retired_at, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=datetime.timezone.utc) > startd:
-            #print(subject.id)
             sub_ids.append(subject.id)
             news.append(subject.metadata['!ZTF_Name'])
             all_rlaps.append(np.array(subject.metadata['rlaps']))
-            #pprint(subject.locations)
             image_urls.append(subject.locations)
 
     subject_set.save()
@@ -86,8 +98,6 @@ def pull_class(startd):
     classifications = []
     class_sources = []
     class_users = []
-
-    startd = datetime.datetime.strptime('2021-11-10', '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
 
     for d in range(len(df)):
         if df['links'][d]['subjects'][0] in np.array(sub_ids):
@@ -104,9 +114,6 @@ def pull_class(startd):
 
         un_class = np.array(classifications)[np.array(class_sources) == new]
         un_class_users = np.array(class_users)[np.array(class_sources) == new]
-        #print(un_class)
-        #print(un_class_users)
-        #print(stats.mode(un_class).mode)
 
         images_available = False
 
@@ -164,7 +171,7 @@ def pull_class(startd):
             elif upload == 'Ia-csm':
                 upload = 'Ia-CSM'
 
-            if 'II' not in upload:
+            if 'II' not in upload or rlap < 9: # We only upload classification to Fritz if Type II and rlap > 9
                 resp = post_comment(new, 'zooniverse classification: ' + upload + ', ' + str(stats.mode(un_class).count) + '/' + str(len(un_class)) +
                     ' classifications', 'zooniverse/'+new+'.png', new+'_zooniverse.png')
 
@@ -172,14 +179,14 @@ def pull_class(startd):
 
             print('Running superfit...')
 
-            run_superfit(new)
+            run_superfit(new) # Should output an image with classification
 
             match = input('Does the superfit classification match SNID? [y/n] ')
 
             if match != 'y':
                 continue
 
-            pre_class = get_classi(new)[0]
+            pre_class = get_classification(new)[0]
             if pre_class == upload:
                 print(new + ' already classified with the same classification on Fritz.')
                 #subject_set.remove(news_ids[n])
@@ -206,5 +213,3 @@ def pull_class(startd):
             else:
                 print(bcolors.FAIL + new + ' comment failed.' + bcolors.ENDC)
                 print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
-
-            #subject_set.remove(news_ids[n])

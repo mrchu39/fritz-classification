@@ -1,27 +1,27 @@
 import base64
+import copy
+import gc
+import glob
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.ticker import MultipleLocator
 import matplotlib.gridspec as gridspec
 import numpy as np
 import os
+import pandas as pd
 import shlex
 import shutil
 import sncosmo
 import subprocess
 import sys
 import time
-import glob
-import copy
-import gc
-import pandas as pd
-from collections import Counter
-from mpl_toolkits.mplot3d import Axes3D
-from panoptes_client import Panoptes, Project, SubjectSet, Subject
 
 from astropy.io import ascii
 from astropy.table import QTable, Table
+from collections import Counter
+from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.ticker import MultipleLocator
+from mpl_toolkits.mplot3d import Axes3D
+from panoptes_client import Panoptes, Project, SubjectSet, Subject
+
 from func import *
 from zooniverse import *
 
@@ -41,6 +41,7 @@ with open('info.info', 'r') as infofile:
     zoo_user = info.split('\n')[5].split(':')[1].strip()
     zoo_pass = info.split('\n')[6].split(':')[1].strip()
 
+# Grab all sources currently uploaded to Zooniverse
 zoo = get_all_in_set()
 
 def get_peak_absmag(z, x0):
@@ -111,6 +112,22 @@ def get_photometry(ztfname, format='flux'):
 
         return QTable([mjd, band, mag, magerr, zpsys], names=('mjd', 'filter', 'mag','magerr', 'zpsys'))
 
+def listComplementElements(list1, list2):
+
+
+    ''' Info : Finds common elements of two lists
+        Input : Two lists
+        Returns : Common elements
+    '''
+
+    storeResults = []
+
+    for num in list1:
+        if num not in list2: # this will essentially iterate your list behind the scenes
+            storeResults.append(num)
+
+    return storeResults
+
 def model_lc(source):
 
     ''' Info : Fits photometry data to light curve using sncosmo.
@@ -146,6 +163,206 @@ def model_lc(source):
 
     return data, result, fitted_model
 
+def plot_box_spec(wave, flux):
+    flux_plot = np.repeat(flux, 2)
+    wv_plot = wave.copy()
+    wv_plot[:-1] += np.diff(wave)/2
+    wv_plot = np.append(wave[0]-(wave[1]-wave[0])/2,
+                        np.append(np.repeat(wv_plot[0:-1], 2),
+                                  wave[-1]+(wave[-1]-wave[-2])/2))
+
+    return wv_plot, flux_plot
+
+def post_lc(source):
+
+    ''' Info : Posts LC data on Fritz as comment, along with nsigma for c and x1 and peak absolute magnitude. Plot is also attached.
+        Input : ZTFname
+        Returns : None
+    '''
+
+    data = get_photometry(source)
+    comment_infos = get_source_api(source)['comments']
+
+    for i in range (len(get_source_api(source)['comments'])):
+
+        comment_info = comment_infos[i]
+        comment = comment_info['text']
+
+        # Check if LC is already posted
+        if 'sncosmo light curve fit' in comment:
+            if int(comment[int(comment.index('n='))+2:].split(',')[0]) != len(data) or 'gayatri' not in comment: # Check if new photometry has been uploaded
+
+                try:
+                    dfit, result, fitted_model = model_lc(source)
+                except RuntimeError:
+                    print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC) # Did not converge on fit
+                    return
+                except ValueError:
+                    print(bcolors.FAIL + 'sncosmo encountered value error. Skipping...' + bcolors.ENDC) # Did not converge on fit
+                    return
+
+                x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
+                c_nstds = np.round(np.abs((result.parameters[4]-c))/c_std, 1)
+
+                sncosmo.plot_lc(dfit, model=fitted_model)
+
+                if np.max(dfit['mjd']) - np.min(dfit['mjd']) < 5: # If <5 nights of photometry, check if user wants to upload
+                    plt.show(block=False)
+
+                    res = input('There are only ' + str(np.round(np.max(dfit['mjd']) - np.min(dfit['mjd']), 1)) + ' days worth of photometry data. Do you still want to proceed? [y/n] ')
+
+                    if res != 'y':
+                        plt.close()
+                        return
+
+                    plt.close()
+
+                plt.savefig('temp.png')
+
+                # If comment exists but new photometry uploaded, edit comment
+                resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'sncosmo light curve fit n='+str(len(data))+', M_peak = '+str(np.round(get_peak_absmag(result.parameters[0], result.parameters[2]),1))+
+                    ', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds)+'. LC page: http://gayatri.caltech.edu:88/query/lc/'+source, 'temp.png', source+'_sncosmo_lc.png')
+
+                if resp['status'] == 'success':
+                    print(bcolors.OKGREEN + source + ' LC update successful.' + bcolors.ENDC)
+                else:
+                    print(bcolors.FAIL + source + ' LC update failed.' + bcolors.ENDC)
+                    print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
+
+                plt.close('all')
+
+                return
+            else:
+                print(source + ' LC up to date.')
+                return
+
+    try:
+        dfit, result, fitted_model = model_lc(source)
+    except RuntimeError:
+        print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC)
+        return
+    except ValueError:
+        print(bcolors.FAIL + 'sncosmo encountered value error. Skipping...' + bcolors.ENDC) # Did not converge on fit
+        return
+
+    x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
+    c_nstds = np.round(np.abs((result.parameters[4]-c)/c_std), 1)
+
+    sncosmo.plot_lc(dfit, model=fitted_model)
+    plt.savefig('temp.png')
+
+    resp = post_comment(source, 'sncosmo light curve fit n='+str(len(data))+', M_peak = '+str(np.round(get_peak_absmag(result.parameters[0], result.parameters[2]),1))+
+        ', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds)+'. LC page: http://gayatri.caltech.edu:88/query/lc/'+source, 'temp.png', source+'_sncosmo_lc.png')
+
+    if resp['status'] == 'success':
+        print(bcolors.OKGREEN + source + ' LC upload successful.' + bcolors.ENDC)
+    else:
+        print(bcolors.FAIL + source + ' LC upload failed.' + bcolors.ENDC)
+        print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
+
+    plt.close('all')
+
+def plot_best_5(source, output, spectra_name, z_snid, top_5, rlaps, show_redshift=False):
+    source_folder = source + spectra_name
+
+    files = np.sort(glob.glob(source_folder+"/*.dat"))
+    if(len(files)==0):
+        print('return, ' + spectra_name)
+        return -1
+
+    rel_files = []
+    for i, f in enumerate(files):
+        if 'comp' in f and int(f.split('comp')[1].split('_')[0]) in top_5:
+            rel_files.append(f)
+    rel_files.append(output + '/' + spectra_name + '_snidflux.dat')
+
+    matches, spectra = read_tables(rel_files)
+
+    for spec_num, i in enumerate(matches):
+        z = i[0][3]
+        snid_type = i[0][2][:-1]
+
+        xi, yi = plot_box_spec(spectra["wavelength"], spectra["flux"])
+        xi /= (1+z)
+        x, y = i[1]["redshifted_wavelength"] / (1+z), i[1]["flux"]
+        specplot(x,y,xi,yi,snid_type,spectra_name,output,i[0][0], z, i[0][4], z_snid, spec_num, rlaps[spec_num], show_redshift=show_redshift)
+
+def read_tables(files):
+    matches_files = files[0:len(files)-1]
+    spectra = Table.read(files[-1], format = "ascii", names = ["wavelength", "flux"])
+    matches = []
+    for i in matches_files:
+        input_data = open(i,'r').readlines()[0].split()
+        row = [[int(input_data[3][:-1]), input_data[4],input_data[5][1::],float(input_data[-3].split("-")[-1]),float(input_data[-1])]]
+        row.append(Table.read(i, format = "ascii", names = ["redshifted_wavelength", "flux"]))
+        matches.append(row)
+    return matches, spectra
+
+def run_class(unclassifys):
+
+    ''' Info : Runs SNID analysis on list of sources
+        Input : list of unclassified sources
+        Returns : transients, SNID classifications, rlap scores, redshifts, redshift errors
+    '''
+
+    print('Clearing directories...')
+
+    # Delete all SNID-generated files to save storage and not confuse the code
+    files = os.listdir(os.getcwd())
+
+    test = os.listdir(os.getcwd()+'/data')
+    for item in test:
+        if item.endswith(".ascii"):
+            os.remove(os.path.join(os.getcwd()+'/data', item))
+
+    if 'outfiles' in files:
+        test = os.listdir(os.getcwd()+'/outfiles')
+        for item in test:
+            shutil.rmtree(os.path.join(os.getcwd()+'/outfiles', item))
+    else:
+        os.mkdir('outfiles')
+
+    test = os.listdir(os.getcwd())
+    for item in test:
+        if item.startswith("ZTF"):
+            os.remove(os.path.join(os.getcwd(), item))
+
+    transients = []
+    types = []
+    rlaps = []
+    reds = []
+    red_errs = []
+
+    print('There are ' + str(len(unclassifys)) + ' unclassified transients.')
+
+    for s in np.arange(0,len(unclassifys)):
+        print(bcolors.OKCYAN + str(s+1) + '/' + str(len(unclassifys)) + bcolors.ENDC + ': ' + bcolors.OKBLUE + unclassifys[s] + bcolors.ENDC)
+        t, f, r, re = snid_analyze(unclassifys[s])
+
+        if t != None:
+            if t == 'II':
+                t = 'Type II'
+            elif t == 'Gal':
+                t = 'Galactic Nuclei'
+            elif t == 'Ia-csm':
+                t = 'Ia-CSM'
+            transients.append(unclassifys[s])
+            types.append(t)
+            rlaps.append(f)
+            reds.append(r)
+            red_errs.append(re)
+
+    # Saves a csv of classified sources -- can be commented out if necessary
+    np.savetxt('SNID_fits.csv', np.rot90(np.fliplr(np.vstack((transients, types, rlaps, reds, red_errs)))), delimiter=',', fmt='%s')
+
+    # Clear the data directory to avoid issues with the submission code
+    test = os.listdir(os.getcwd()+'/data')
+    for item in test:
+        if item.endswith(".ascii"):
+            os.remove(os.path.join(os.getcwd()+'/data', item))
+
+    return transients, types, rlaps, reds, red_errs
+
 def snid_analyze(source):
 
     ''' Info : Runs SNID analysis on given source and returns classification data
@@ -153,6 +370,10 @@ def snid_analyze(source):
         Input : source
         Returns : classification, rlap score, redshift, redshift error
     '''
+
+    if source in np.array(zoo):
+        print(source + ' already submitted to Zooniverse within the last 6 months.')
+        return None, None, None, None
 
     fname = write_ascii_file(source, path=os.getcwd(), auto=False)[0] # Downloads spectrum data in ASCII from Fritz
 
@@ -317,7 +538,13 @@ def snid_analyze(source):
                 newType = -1
                 for i in range(len(Top50)):
                     line = Top50[i]
-                    if(line["type"] not in top5Types):
+
+                    #print(str(line['type']) in top5Types)
+                    #print(len(top5Types))
+                    #print(np.array(top5Types))
+                    #print(top5Types)
+
+                    if(str(line["type"]) not in top5Types):
                         newType = i
                         break
                 for i in range(len(Top5)-1,-1,-1):
@@ -351,7 +578,7 @@ def snid_analyze(source):
                 for k in range(4,2,-1):
                     top5Types = np.unique(Top5["type"])
                     for i in Top50:
-                        if(i["type"] not in top5Types):
+                        if(str(i["type"]) not in top5Types):
                             Top5[k] = i
                             break
                 Top5.sort("no")
@@ -412,9 +639,6 @@ def snid_analyze(source):
             except ValueError:
                 return None, None, None, None
     else:
-        if source in np.array(zoo):
-            print(source + ' already submitted to Zooniverse within the last 6 months.')
-            return None, None, None, None
 
         zoo_sub = input('Submit to Zooniverse? [y/n] ')
 
@@ -490,6 +714,8 @@ def snid_analyze(source):
                     subject.metadata.update({"!ZTF_Version": i["!ZTF_Version"], "!ZTF_Name": i["!ZTF_Name"], "z_snid": i["z_snid"], "z_snid_err": i["z_snid_err"],
                         'rlaps': [sample_remaining['rlap_1'][0], sample_remaining['rlap_2'][0], sample_remaining['rlap_3'][0], sample_remaining['rlap_4'][0], sample_remaining['rlap_5'][0]]})
 
+                    print(subject.metadata)
+
                     subject.save()
                     new_subjects.append(subject)
                 except FileNotFoundError:
@@ -505,38 +731,7 @@ def snid_analyze(source):
 
         return None, None, None, None
 
-def listComplementElements(list1, list2):
-    storeResults = []
-
-    for num in list1:
-        if num not in list2: # this will essentially iterate your list behind the scenes
-            storeResults.append(num)
-
-    return storeResults
-
-def read_tables(files):
-    matches_files = files[0:len(files)-1]
-    spectra = Table.read(files[-1], format = "ascii", names = ["wavelength", "flux"])
-    matches = []
-    for i in matches_files:
-        input_data = open(i,'r').readlines()[0].split()
-        row = [[int(input_data[3][:-1]), input_data[4],input_data[5][1::],float(input_data[-3].split("-")[-1]),float(input_data[-1])]]
-        row.append(Table.read(i, format = "ascii", names = ["redshifted_wavelength", "flux"]))
-        matches.append(row)
-    return matches, spectra
-
-def plot_box_spec(wave, flux):
-    flux_plot = np.repeat(flux, 2)
-    wv_plot = wave.copy()
-    wv_plot[:-1] += np.diff(wave)/2
-    wv_plot = np.append(wave[0]-(wave[1]-wave[0])/2,
-                        np.append(np.repeat(wv_plot[0:-1], 2),
-                                  wave[-1]+(wave[-1]-wave[-2])/2))
-
-    return wv_plot, flux_plot
-
-def specplot(x,y,xi,yi,snid_type,fname,output,best_num, z_template, z_template_unc, z_snid,
-             spec_num, rlap, show_redshift=False):
+def specplot(x, y, xi, yi, snid_type, fname, output, best_num, z_template, z_template_unc, z_snid, spec_num, rlap, show_redshift=False):
     fig, ax = plt.subplots(figsize=(8,4.5))
     ax.plot(xi,yi,color='#32384D',alpha=0.5,
              label='New SN')
@@ -549,7 +744,7 @@ def specplot(x,y,xi,yi,snid_type,fname,output,best_num, z_template, z_template_u
                 va='center',
                 fontsize=15, transform=plt.gcf().transFigure)
     else:
-        ax.text(0.7, 0.955, 'Match #' + str(spec_num+1) + ', rlap=' + str(rlap),
+        ax.text(0.78, 0.955, 'Match #' + str(spec_num+1),
                 va='center',
                 fontsize=15, transform=plt.gcf().transFigure)
 
@@ -576,61 +771,6 @@ def specplot(x,y,xi,yi,snid_type,fname,output,best_num, z_template, z_template_u
     #print(output + 'snidfits_emclip_' + fname + "_" + str(best_num) + '.png')
     plt.close(fig)
     plt.close()
-
-def plot_best_5(source, output, spectra_name, z_snid, top_5, rlaps, show_redshift=False):
-    source_folder = source + spectra_name
-
-    files = np.sort(glob.glob(source_folder+"/*.dat"))
-    if(len(files)==0):
-        print('return, ' + spectra_name)
-        return -1
-
-    rel_files = []
-    for i, f in enumerate(files):
-        if 'comp' in f and int(f.split('comp')[1].split('_')[0]) in top_5:
-            rel_files.append(f)
-    rel_files.append(output + '/' + spectra_name + '_snidflux.dat')
-
-    matches, spectra = read_tables(rel_files)
-
-    for spec_num, i in enumerate(matches):
-        z = i[0][3]
-        snid_type = i[0][2][:-1]
-
-        xi, yi = plot_box_spec(spectra["wavelength"], spectra["flux"])
-        xi /= (1+z)
-        x, y = i[1]["redshifted_wavelength"] / (1+z), i[1]["flux"]
-        specplot(x,y,xi,yi,snid_type,spectra_name,output,i[0][0], z, i[0][4], z_snid, spec_num, rlaps[spec_num], show_redshift=show_redshift)
-
-def submit_reds(no_reds, f):
-
-    ''' Info : Submits redshift information to Fritz
-        Input : list of sources with classifications and no redshift
-        Returns : None
-    '''
-
-    transients_r, types_r, rlaps_r, reds_r, red_errs_r = run_class(no_reds)
-
-    if len(transients_r) != 0:
-        print('ZTFname\t\tRedshift\t\trlaps')
-        for tr in np.arange(0,len(transients_r)):
-            print(transients_r[tr] + '\t' + reds_r[tr] + ' +/- ' + red_errs_r[tr] + '\t' + rlaps_r[tr])
-
-        up = input('Upload these redshifts? [y/n] ')
-
-        if up == 'y':
-            for tr in np.arange(0,len(transients_r)):
-                fritz_redshift = submit_fritz_redshift(transients_r[tr], reds_r[tr], red_errs_r[tr])
-
-                if fritz_redshift['status'] == 'success':
-                    print(bcolors.OKGREEN + transients_r[tr] + 'classification upload successful.' + bcolors.ENDC)
-                else:
-                    print(bcolors.FAIL + transients_r[tr] + 'classification upload failed.' + bcolors.ENDC)
-                    print(bcolors.FAIL + fritz_redshift['message'] + bcolors.ENDC)
-
-                f['redshift'][np.argwhere(f['Source Name'] == transients_r[tr])] = reds_r[tr]
-
-            f.write('RCF_sources.ascii', format='ascii', overwrite=True, delimiter='\t')
 
 def submit_class(unclassifys, f):
 
@@ -677,156 +817,32 @@ def submit_class(unclassifys, f):
 
             f.write('RCF_sources.ascii', format='ascii', overwrite=True, delimiter='\t')
 
-def run_class(unclassifys):
+def submit_reds(no_reds, f):
 
-    ''' Info : Runs SNID analysis on list of sources
-        Input : list of unclassified sources
-        Returns : transients, SNID classifications, rlap scores, redshifts, redshift errors
-    '''
-
-    print('Clearing directories...')
-
-    # Delete all SNID-generated files to save storage and not confuse the code
-    files = os.listdir(os.getcwd())
-
-    test = os.listdir(os.getcwd()+'/data')
-    for item in test:
-        if item.endswith(".ascii"):
-            os.remove(os.path.join(os.getcwd()+'/data', item))
-
-    if 'outfiles' in files:
-        test = os.listdir(os.getcwd()+'/outfiles')
-        for item in test:
-            shutil.rmtree(os.path.join(os.getcwd()+'/outfiles', item))
-    else:
-        os.mkdir('outfiles')
-
-    test = os.listdir(os.getcwd())
-    for item in test:
-        if item.startswith("ZTF"):
-            os.remove(os.path.join(os.getcwd(), item))
-
-    transients = []
-    types = []
-    rlaps = []
-    reds = []
-    red_errs = []
-
-    print('There are ' + str(len(unclassifys)) + ' unclassified transients.')
-
-    for s in np.arange(0,len(unclassifys)):
-        print(bcolors.OKCYAN + str(s+1) + '/' + str(len(unclassifys)) + bcolors.ENDC + ': ' + bcolors.OKBLUE + unclassifys[s] + bcolors.ENDC)
-        t, f, r, re = snid_analyze(unclassifys[s])
-
-        if t != None:
-            if t == 'II':
-                t = 'Type II'
-            elif t == 'Gal':
-                t = 'Galactic Nuclei'
-            elif t == 'Ia-csm':
-                t = 'Ia-CSM'
-            transients.append(unclassifys[s])
-            types.append(t)
-            rlaps.append(f)
-            reds.append(r)
-            red_errs.append(re)
-
-    # Saves a csv of classified sources -- can be commented out if necessary
-    np.savetxt('SNID_fits.csv', np.rot90(np.fliplr(np.vstack((transients, types, rlaps, reds, red_errs)))), delimiter=',', fmt='%s')
-
-    # Clear the data directory to avoid issues with the submission code
-    test = os.listdir(os.getcwd()+'/data')
-    for item in test:
-        if item.endswith(".ascii"):
-            os.remove(os.path.join(os.getcwd()+'/data', item))
-
-    return transients, types, rlaps, reds, red_errs
-
-def post_lc(source):
-
-    ''' Info : Posts LC data on Fritz as comment, along with nsigma for c and x1 and peak absolute magnitude. Plot is also attached.
-        Input : ZTFname
+    ''' Info : Submits redshift information to Fritz
+        Input : list of sources with classifications and no redshift
         Returns : None
     '''
 
-    data = get_photometry(source)
-    comment_infos = get_source_api(source)['comments']
+    transients_r, types_r, rlaps_r, reds_r, red_errs_r = run_class(no_reds)
 
-    for i in range (len(get_source_api(source)['comments'])):
+    if len(transients_r) != 0:
+        print('ZTFname\t\tRedshift\t\trlaps')
+        for tr in np.arange(0,len(transients_r)):
+            print(transients_r[tr] + '\t' + reds_r[tr] + ' +/- ' + red_errs_r[tr] + '\t' + rlaps_r[tr])
 
-        comment_info = comment_infos[i]
-        comment = comment_info['text']
+        up = input('Upload these redshifts? [y/n] ')
 
-        # Check if LC is already posted
-        if 'sncosmo light curve fit' in comment:
-            if int(comment[int(comment.index('n='))+2:].split(',')[0]) != len(data) or 'gayatri' not in comment: # Check if new photometry has been uploaded
+        if up == 'y':
+            for tr in np.arange(0,len(transients_r)):
+                fritz_redshift = submit_fritz_redshift(transients_r[tr], reds_r[tr], red_errs_r[tr])
 
-                try:
-                    dfit, result, fitted_model = model_lc(source)
-                except RuntimeError:
-                    print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC) # Did not converge on fit
-                    return
-                except ValueError:
-                    print(bcolors.FAIL + 'sncosmo encountered value error. Skipping...' + bcolors.ENDC) # Did not converge on fit
-                    return
-
-                x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
-                c_nstds = np.round(np.abs((result.parameters[4]-c))/c_std, 1)
-
-                sncosmo.plot_lc(dfit, model=fitted_model)
-
-                if np.max(dfit['mjd']) - np.min(dfit['mjd']) < 5: # If <5 nights of photometry, check if user wants to upload
-                    plt.show(block=False)
-
-                    res = input('There are only ' + str(np.round(np.max(dfit['mjd']) - np.min(dfit['mjd']), 1)) + ' days worth of photometry data. Do you still want to proceed? [y/n] ')
-
-                    if res != 'y':
-                        plt.close()
-                        return
-
-                    plt.close()
-
-                plt.savefig('temp.png')
-
-                # If comment exists but new photometry uploaded, edit comment
-                resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'sncosmo light curve fit n='+str(len(data))+', M_peak = '+str(np.round(get_peak_absmag(result.parameters[0], result.parameters[2]),1))+
-                    ', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds)+'. LC page: http://gayatri.caltech.edu:88/query/lc/'+source, 'temp.png', source+'_sncosmo_lc.png')
-
-                if resp['status'] == 'success':
-                    print(bcolors.OKGREEN + source + ' LC update successful.' + bcolors.ENDC)
+                if fritz_redshift['status'] == 'success':
+                    print(bcolors.OKGREEN + transients_r[tr] + 'classification upload successful.' + bcolors.ENDC)
                 else:
-                    print(bcolors.FAIL + source + ' LC update failed.' + bcolors.ENDC)
-                    print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
+                    print(bcolors.FAIL + transients_r[tr] + 'classification upload failed.' + bcolors.ENDC)
+                    print(bcolors.FAIL + fritz_redshift['message'] + bcolors.ENDC)
 
-                plt.close('all')
+                f['redshift'][np.argwhere(f['Source Name'] == transients_r[tr])] = reds_r[tr]
 
-                return
-            else:
-                print(source + ' LC up to date.')
-                return
-
-    try:
-        dfit, result, fitted_model = model_lc(source)
-    except RuntimeError:
-        print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC)
-        return
-    except ValueError:
-        print(bcolors.FAIL + 'sncosmo encountered value error. Skipping...' + bcolors.ENDC) # Did not converge on fit
-        return
-
-    x1_nstds = np.round(np.abs((result.parameters[3]-x1)/x1_std), 1)
-    c_nstds = np.round(np.abs((result.parameters[4]-c)/c_std), 1)
-
-    sncosmo.plot_lc(dfit, model=fitted_model)
-    plt.savefig('temp.png')
-
-    resp = post_comment(source, 'sncosmo light curve fit n='+str(len(data))+', M_peak = '+str(np.round(get_peak_absmag(result.parameters[0], result.parameters[2]),1))+
-        ', x1_nstds = '+str(x1_nstds)+', c_nstds = '+str(c_nstds)+'. LC page: http://gayatri.caltech.edu:88/query/lc/'+source, 'temp.png', source+'_sncosmo_lc.png')
-
-    if resp['status'] == 'success':
-        print(bcolors.OKGREEN + source + ' LC upload successful.' + bcolors.ENDC)
-    else:
-        print(bcolors.FAIL + source + ' LC upload failed.' + bcolors.ENDC)
-        print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
-
-    plt.close('all')
+            f.write('RCF_sources.ascii', format='ascii', overwrite=True, delimiter='\t')
