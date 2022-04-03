@@ -12,7 +12,7 @@ This tool pulls data from Fritz, uses SNID to classify transients, and uploads c
 
 Install the required Python packages with `pip install -r requirements.txt`.
 
-Installation of SNID is detailed on the above link. Ensure that its dependencies (PGPLOT) are installed. You must download the correct templates for this application. As it is too large to upload here, ask me for them. Installation of superfit is also detailed above, and the correct templates will also need to be installed. Enter in the location the SNID executable and Superfit Python files in the generated info file. Installation of the panoptes client is necessary for the Zooniverse classifications.
+Installation of SNID is detailed on the above link. Ensure that its dependencies (PGPLOT) are installed. **You must download the correct templates for this application**. As they are too large to upload here, ask me for them. Installation of superfit is also detailed above, and the correct templates will also need to be installed. Enter in the location the SNID executable and Superfit Python files in the generated info file.
 
 Generate your unique Fritz API token by going to your [profile](https://fritz.science/profile), finding "Generate New Token for Command-Line Authentication", entering in a name (this is not important), checking all the boxes, and clicking "generate token". Running the program for the first time will generate a file called `info.info`, enter in the API token where appropriate in the file. **Let the code generate the file, the string must be parsed correctly.**
 
@@ -34,7 +34,7 @@ In most cases, you will want to look for newly classified or saved transients fr
 
 ### -1. Zooniverse Classifications
 
-The code will then ask whether you would like to pull classifications from Zooniverse. If you select yes, all objects with more than 11 classifications retired from the inputted date will be pulled. If those objects have a classification that a majority agree with, it will prompt the user to input the classification. **Enter it as it appears on the image displayed**. If it is a Type II, Superfit will run. If the identified type on Superfit agrees, the user will indicate that this is the case and the object will be formally classified on Fritz. If not, a comment will be submitted with this information.
+The code will then ask whether you would like to pull classifications from Zooniverse. If you select yes, all objects with more than 11 classifications retired from the inputted date will be pulled. If those objects have a classification that a majority agree with, it will prompt the user to input the classification. **Enter it as it appears on the image displayed**. If it is a Type II and the rlap score from when SNID ran on it is >9, Superfit will run. If the identified type on Superfit agrees, the user will indicate that this is the case and the object will be formally classified on Fritz. If not, a comment will be submitted with this information.
 
 This is before the rest of the procedure because if you submit classifications to Fritz, you want it to be updated before you submit reports to TNS.
 
@@ -102,11 +102,16 @@ After completing all in the list, the script will indicate that the submission p
 ## Plans
 
 - [x] Include additional classification techniques using photometry.
+- [x] Additional accuracy with Zooniverse
 - [ ] ~~Include RCF checking through the API and with photometry curves. (This is being looked into but may be challenging as it takes significantly longer to do it through API.)~~ This is not really practical as it is too time-inefficient and requires too much user input anyway.
 - [ ] Assigning SEDM follow-ups for noisy data or as addition with RCF checking.
-- [ ] Additional accuracy with Zooniverse
 
 ## Changelog
+
+### 2022-04-03
+
+- Added in rlap cutoff of 9 for uploading classifications.
+- Minor improvements.
 
 ### 2022-02-07
 
