@@ -257,6 +257,10 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                     print(ztfname + ' already uploaded to TNS with same classification.')
                     continue
                 else:
+                    if classify == 'duplicate':
+                        print(ztfname + ' is a duplicate, continuing...')
+                        continue
+
                     if input(ztfname + ' classified on Fritz as ' + classify + ', submit another classification? [y/n] ') != 'y':
                         continue
 
