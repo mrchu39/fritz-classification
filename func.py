@@ -207,7 +207,7 @@ def APO(specid):
 
     return OBSDATE.split(' \n')[0], EXPTIME.split(' \n')[0], OBSERVERS.split(' \n')[0], REDUCERS
 
-def class_submission(sources, tns_names, classifys, class_dates):
+def class_submission(sources, tns_names, classifys, class_dates, users):
 
     ''' Info : Takes source list and submits those with classifications that have not been submitted prior by ZTF
         Input : source list, TNS names of sources, classifications, classifiction dates
@@ -245,6 +245,10 @@ def class_submission(sources, tns_names, classifys, class_dates):
 
             class_date = class_dates[sc]
             classify = classifys[sc]
+            name = users[sc]
+
+            if name == 'K. Hinds':
+                name == 'K. R. Hinds'
 
             prior, type = check_TNS_class(ztfname)
 
@@ -253,18 +257,8 @@ def class_submission(sources, tns_names, classifys, class_dates):
                     print(ztfname + ' already uploaded to TNS with same classification.')
                     continue
                 else:
-                    if prior == 'ZTF':
-                        if input(ztfname + ' already uploaded to TNS by ZTF, submit another classification? [y/n] ') != 'y':
-                            continue
-                    else:
-                        if input(ztfname + ' already uploaded to TNS by ' + prior + ', submit another classification? [y/n] ') != 'y':
-                            continue
-
-
-
-            #print (classify, class_date)
-
-            #print(savedates)
+                    if input(ztfname + ' classified on Fritz as ' + classify + ', submit another classification? [y/n] ') != 'y':
+                        continue
 
             spectrum_info = write_ascii_file(ztfname) #returns "spectrum_name"
             spectrum_name = spectrum_info[0]
@@ -287,10 +281,22 @@ def class_submission(sources, tns_names, classifys, class_dates):
 
                     inst = (a['data']['instrument_name'])
 
-
                     if inst == 'SEDM':
 
-                        classifiers = 'M. Chu, A. Dahiwale, C. Fremling(Caltech) on behalf of the Zwicky Transient Facility (ZTF)'### Change accordingly
+                        auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
+
+                        if name != 'S. ZTF':
+                            flag_1 = 0
+                            for au, auth in enumerate(auths):
+                                if name in auth:
+                                    auths = np.append(name, np.delete(auths, au))
+                                    flag_1 = 1
+                                    break
+
+                            if flag_1 == 0:
+                                auths = np.append(name, auths)
+
+                        classifiers = ', '.join(map(str, auths)) + ' on behalf of the Zwicky Transient Facility (ZTF)'
                         source_group = 48 ### Require source group id from drop down list, 0 is for None
                         spectypes = np.array(['object','host','sky','arcs','synthetic'])
 
@@ -303,7 +309,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         spectype_id = ['object', 'host', 'sky', 'arcs', 'synthetic'].index(spectype) + 1
 
                         header = (a['data']['altdata'])
-                        obsdate = str((header['UTC']).split('T')[0])+' '+str((header['UTC']).split('T')[1])
+                        obsdate = header['UTC'].replace('T', ' ')
 
                         classificationReport = TNSClassificationReport()
                         classificationReport.name = get_IAUname(ztfname)[3:]
@@ -324,32 +330,22 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                        pprint(classificationReport.fill(), tab='  ')
-                        proceed = input("\nProceed with classification and upload? ([y]/n) : ")
-                        if proceed == 'y' and not proceed.strip() == '':
-
-                            # ASCII FILE UPLOAD
-                            print ("\n")
-                            response = upload_to_TNS(files)
-                            print (response)
-
-                            if not response:
-                                print("File upload didn't work")
-                                print(response)
-                                #return False
-
-                            print(response['id_code'], response['id_message'],
-                                  "\nSuccessfully uploaded ascii spectrum")
-                            #classificationReport.asciiName = response['data'][-1]
-
-                            report_id = tns_classify(classificationReport)
-                            if tns_feedback(report_id) == True:
-                                post_comment(ztfname, 'Uploaded to TNS')
-
-
                     if inst == 'SPRAT':
 
-                        classifiers = 'D. A. Perley(LJMU), M. Chu, A. Dahiwale, C. Fremling (Caltech) on behalf of the Zwicky Transient Facility (ZTF)'### Change accordingly
+                        auths = np.array(['D. Perley (LJMU)', 'M. Chu', 'A. Dahiwale', 'C. Fremling']) ### Change accordingly
+
+                        if name != 'S. ZTF':
+                            flag_1 = 0
+                            for au, auth in enumerate(auths):
+                                if name in auth:
+                                    auths = np.append(name, np.delete(auths, au))
+                                    flag_1 = 1
+                                    break
+
+                            if flag_1 == 0:
+                                auths = np.append(name, auths)
+
+                        classifiers = ', '.join(map(str, auths)) + ' on behalf of the Zwicky Transient Facility (ZTF)'
                         source_group = 48 ### Require source group id from drop down list, 0 is for None
                         spectypes = np.array(['object','host','sky','arcs','synthetic'])
 
@@ -362,7 +358,8 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         spectype_id = ['object', 'host', 'sky', 'arcs', 'synthetic'].index(spectype) + 1
 
                         header = (a['data']['altdata'])
-                        obsdate = str(header['OBSDATE'].split('T')[0])+' '+str(header['OBSDATE'].split('T')[1])
+
+                        obsdate = a['data']['observed_at'].replace('T', ' ')
 
                         classificationReport = TNSClassificationReport()
                         classificationReport.name = get_IAUname(ztfname)[3:]
@@ -374,7 +371,8 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = obsdate
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
-                        classificationReport.expTime = (header['EXPTIME'])
+                        if len(header) > 0:
+                            classificationReport.expTime = (header['EXPTIME'])
                         classificationReport.observers = 'LTRobot'
                         classificationReport.reducers = 'D. Perley'
                         classificationReport.specTypeID = spectype_id
@@ -383,33 +381,22 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                        pprint(classificationReport.fill(), tab='  ')
-                        proceed = input("\nProceed with classification and upload? ([y]/n) : ")
-                        if proceed == 'y' and not proceed.strip() == '':
-
-                            # ASCII FILE UPLOAD
-                            print ("\n")
-                            response = upload_to_TNS(files)
-                            print (response)
-
-                            if not response:
-                                print("File upload didn't work")
-                                print(response)
-                                #return False
-
-                            print(response['id_code'], response['id_message'],
-                                  "\nSuccessfully uploaded ascii spectrum")
-                            #classificationReport.asciiName = response['data'][-1]
-
-                            report_id = tns_classify(classificationReport)
-                            if tns_feedback(report_id) == True:
-                                post_comment(ztfname, 'Uploaded to TNS')
-
-
-
                     if inst == 'ALFOSC':
 
-                        classifiers = 'M. Chu, A. Dahiwale, C. Fremling(Caltech) on behalf of the Zwicky Transient Facility (ZTF)'### Change accordingly
+                        auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
+
+                        if name != 'S. ZTF':
+                            flag_1 = 0
+                            for au, auth in enumerate(auths):
+                                if name in auth:
+                                    auths = np.append(name, np.delete(auths, au))
+                                    flag_1 = 1
+                                    break
+
+                            if flag_1 == 0:
+                                auths = np.append(name, auths)
+
+                        classifiers = ', '.join(map(str, auths)) + ' on behalf of the Zwicky Transient Facility (ZTF)'
                         source_group = 48 ### Require source group id from drop down list, 0 is for None
                         spectypes = np.array(['object','host','sky','arcs','synthetic'])
 
@@ -422,7 +409,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         spectype_id = ['object', 'host', 'sky', 'arcs', 'synthetic'].index(spectype) + 1
 
                         header = (a['data']['altdata'])
-                        obsdate = str(a['data']['observed_at'].split('T')[0])+' '+str(a['data']['observed_at'].split('T')[1])
+                        obsdate = a['data']['observed_at'].replace('T', ' ')
 
                         classificationReport = TNSClassificationReport()
                         classificationReport.name = get_IAUname(ztfname)[3:]
@@ -443,33 +430,22 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                        pprint(classificationReport.fill(), tab='  ')
-                        proceed = input("\nProceed with classification and upload? ([y]/n) : ")
-                        if proceed == 'y' and not proceed.strip() == '':
-
-                            # ASCII FILE UPLOAD
-                            print ("\n")
-                            response = upload_to_TNS(files)
-                            print (response)
-
-                            if not response:
-                                print("File upload didn't work")
-                                print(response)
-                                #return False
-
-                            print(response['id_code'], response['id_message'],
-                                  "\nSuccessfully uploaded ascii spectrum")
-                            #classificationReport.asciiName = response['data'][-1]
-
-                            report_id = tns_classify(classificationReport)
-                            if tns_feedback(report_id) == True:
-                                post_comment(ztfname, 'Uploaded to TNS')
-
-
-
                     if inst == 'DBSP':
 
-                        classifiers = 'M. Chu, A. Dahiwale, C. Fremling(Caltech) on behalf of the Zwicky Transient Facility (ZTF)'### Change accordingly
+                        auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
+
+                        if name != 'S. ZTF':
+                            flag_1 = 0
+                            for au, auth in enumerate(auths):
+                                if name in auth:
+                                    auths = np.append(name, np.delete(auths, au))
+                                    flag_1 = 1
+                                    break
+
+                            if flag_1 == 0:
+                                auths = np.append(name, auths)
+
+                        classifiers = ', '.join(map(str, auths)) + ' on behalf of the Zwicky Transient Facility (ZTF)'
                         source_group = 48 ### Require source group id from drop down list, 0 is for None
                         spectypes = np.array(['object','host','sky','arcs','synthetic'])
 
@@ -481,7 +457,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         spectype='object'
                         spectype_id = ['object', 'host', 'sky', 'arcs', 'synthetic'].index(spectype) + 1
 
-                        OBSDATE = str(a['data']['observed_at'].split('T')[0])+' '+str(a['data']['observed_at'].split('T')[1])
+                        obsdate = a['data']['observed_at'].replace('T', ' ')
 
                         classificationReport = TNSClassificationReport()
                         classificationReport.name = get_IAUname(ztfname)[3:]
@@ -491,7 +467,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         classificationReport.classificationID = get_TNS_classification_ID(classify)
                         classificationReport.redshift = get_redshift(ztfname)
                         classificationReport.classificationComments = classification_comments
-                        classificationReport.obsDate = OBSDATE
+                        classificationReport.obsDate = obsdate
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
                         #classificationReport.expTime = '900'
                         classificationReport.observers = (str(a['data']['observers'][0]['first_name'])+' '+str(a['data']['observers'][0]['last_name']))
@@ -502,32 +478,22 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                        pprint(classificationReport.fill(), tab='  ')
-                        proceed = input("\nProceed with classification and upload? ([y]/n) : ")
-                        if proceed == 'y' and not proceed.strip() == '':
-
-                            # ASCII FILE UPLOAD
-                            print ("\n")
-                            response = upload_to_TNS(files)
-                            print (response)
-
-                            if not response:
-                                print("File upload didn't work")
-                                print(response)
-                                #return False
-
-                            print(response['id_code'], response['id_message'],
-                                  "\nSuccessfully uploaded ascii spectrum")
-                            #classificationReport.asciiName = response['data'][-1]
-
-                            report_id = tns_classify(classificationReport)
-                            if tns_feedback(report_id) == True:
-                                post_comment(ztfname, 'Uploaded to TNS')
-
-
                     if inst == 'LRIS':
 
-                        classifiers = 'M. Chu, A. Dahiwale, C. Fremling(Caltech) on behalf of the Zwicky Transient Facility (ZTF)'### Change accordingly
+                        auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
+
+                        if name != 'S. ZTF':
+                            flag_1 = 0
+                            for au, auth in enumerate(auths):
+                                if name in auth:
+                                    auths = np.append(name, np.delete(auths, au))
+                                    flag_1 = 1
+                                    break
+
+                            if flag_1 == 0:
+                                auths = np.append(name, auths)
+
+                        classifiers = ', '.join(map(str, auths)) + ' on behalf of the Zwicky Transient Facility (ZTF)'
                         source_group = 48 ### Require source group id from drop down list, 0 is for None
                         spectypes = np.array(['object','host','sky','arcs','synthetic'])
 
@@ -541,7 +507,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         spectype='object'
                         spectype_id = ['object', 'host', 'sky', 'arcs', 'synthetic'].index(spectype) + 1
 
-                        OBSDATE = str(a['data']['observed_at'].split('T')[0])+' '+str(a['data']['observed_at'].split('T')[1])
+                        OBSDATE = a['data']['observed_at'].replace('T', ' ')
 
                         classificationReport = TNSClassificationReport()
                         classificationReport.name = get_IAUname(ztfname)[3:]
@@ -562,32 +528,122 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                        pprint(classificationReport.fill(), tab='  ')
-                        proceed = input("\nProceed with classification and upload? ([y]/n) : ")
-                        if proceed == 'y' and not proceed.strip() == '':
+                    if inst == 'NIRES':
 
-                            # ASCII FILE UPLOAD
-                            print ("\n")
-                            response = upload_to_TNS(files)
-                            print (response)
+                        auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
 
-                            if not response:
-                                print("File upload didn't work")
-                                print(response)
-                                #return False
+                        if name != 'S. ZTF':
+                            flag_1 = 0
+                            for au, auth in enumerate(auths):
+                                if name in auth:
+                                    auths = np.append(name, np.delete(auths, au))
+                                    flag_1 = 1
+                                    break
 
-                            print(response['id_code'], response['id_message'],
-                                  "\nSuccessfully uploaded ascii spectrum")
-                            #classificationReport.asciiName = response['data'][-1]
+                            if flag_1 == 0:
+                                auths = np.append(name, auths)
 
-                            report_id = tns_classify(classificationReport)
-                            if tns_feedback(report_id) == True:
-                                post_comment(ztfname, 'Uploaded to TNS')
+                        classifiers = ', '.join(map(str, auths)) + ' on behalf of the Zwicky Transient Facility (ZTF)'
+                        source_group = 48 ### Require source group id from drop down list, 0 is for None
+                        spectypes = np.array(['object','host','sky','arcs','synthetic'])
 
+                        header = (a['data']['altdata'])
+
+                        #proprietary_period = int(input("Proprietary period in years:", x)
+                        proprietary_period = '0'
+                        proprietary_units = "years"
+                        spec_comments =''
+                        classification_comments = ''
+                        spectype='object'
+                        spectype_id = ['object', 'host', 'sky', 'arcs', 'synthetic'].index(spectype) + 1
+
+                        OBSDATE = a['data']['observed_at'].replace('T', ' ')
+
+                        classificationReport = TNSClassificationReport()
+                        classificationReport.name = get_IAUname(ztfname)[3:]
+                        classificationReport.fitsName = ''
+                        classificationReport.asciiName = spectrum_name
+                        classificationReport.classifierName = classifiers
+                        classificationReport.classificationID = get_TNS_classification_ID(classify)
+                        classificationReport.redshift = get_redshift(ztfname)
+                        classificationReport.classificationComments = classification_comments
+                        classificationReport.obsDate = OBSDATE
+                        classificationReport.instrumentID = get_TNS_instrument_ID(inst)
+                        #classificationReport.expTime = '300'
+                        classificationReport.observers = (str(a['data']['observers'][0]['first_name'])+' '+str(a['data']['observers'][0]['last_name']))
+                        classificationReport.reducers = (str(a['data']['reducers'][0]['first_name'])+' '+str(a['data']['reducers'][0]['last_name']))
+                        classificationReport.specTypeID = spectype_id
+                        classificationReport.spectrumComments = spec_comments
+                        classificationReport.groupID = source_group
+                        classificationReport.spec_proprietary_period_value = proprietary_period
+                        classificationReport.spec_proprietary_period_units = proprietary_units
+
+                    if inst == 'GMOS_GS':
+
+                        auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
+
+                        if name != 'S. ZTF':
+                            flag_1 = 0
+                            for au, auth in enumerate(auths):
+                                if name in auth:
+                                    auths = np.append(name, np.delete(auths, au))
+                                    flag_1 = 1
+                                    break
+
+                            if flag_1 == 0:
+                                auths = np.append(name, auths)
+
+                        classifiers = ', '.join(map(str, auths)) + ' on behalf of the Zwicky Transient Facility (ZTF)'
+                        source_group = 48 ### Require source group id from drop down list, 0 is for None
+                        spectypes = np.array(['object','host','sky','arcs','synthetic'])
+
+                        header = (a['data']['altdata'])
+
+                        #proprietary_period = int(input("Proprietary period in years:", x)
+                        proprietary_period = '0'
+                        proprietary_units = "years"
+                        spec_comments =''
+                        classification_comments = ''
+                        spectype='object'
+                        spectype_id = ['object', 'host', 'sky', 'arcs', 'synthetic'].index(spectype) + 1
+
+                        OBSDATE = a['data']['observed_at'].replace('T', ' ')
+
+                        classificationReport = TNSClassificationReport()
+                        classificationReport.name = get_IAUname(ztfname)[3:]
+                        classificationReport.fitsName = ''
+                        classificationReport.asciiName = spectrum_name
+                        classificationReport.classifierName = classifiers
+                        classificationReport.classificationID = get_TNS_classification_ID(classify)
+                        classificationReport.redshift = get_redshift(ztfname)
+                        classificationReport.classificationComments = classification_comments
+                        classificationReport.obsDate = OBSDATE
+                        classificationReport.instrumentID = get_TNS_instrument_ID(inst)
+                        #classificationReport.expTime = '300'
+                        classificationReport.observers = (str(a['data']['observers'][0]['first_name'])+' '+str(a['data']['observers'][0]['last_name']))
+                        classificationReport.reducers = (str(a['data']['reducers'][0]['first_name'])+' '+str(a['data']['reducers'][0]['last_name']))
+                        classificationReport.specTypeID = spectype_id
+                        classificationReport.spectrumComments = spec_comments
+                        classificationReport.groupID = source_group
+                        classificationReport.spec_proprietary_period_value = proprietary_period
+                        classificationReport.spec_proprietary_period_units = proprietary_units
 
                     if inst == 'DIS':
 
-                        classifiers = 'Melissa L. Graham (UW), M. Chu, A. Dahiwale, C. Fremling(Caltech) on behalf of the Zwicky Transient Facility (ZTF)'### Change accordingly
+                        auths = np.array(['M. Graham (UW)', 'M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
+
+                        if name != 'S. ZTF':
+                            flag_1 = 0
+                            for au, auth in enumerate(auths):
+                                if name in auth:
+                                    auths = np.append(name, np.delete(auths, au))
+                                    flag_1 = 1
+                                    break
+
+                            if flag_1 == 0:
+                                auths = np.append(name, auths)
+
+                        classifiers = ', '.join(map(str, auths)) + ' on behalf of the Zwicky Transient Facility (ZTF)'
                         source_group = 48 ### Require source group id from drop down list, 0 is for None
                         spectypes = np.array(['object','host','sky','arcs','synthetic'])
                         #proprietary_period = int(input("Proprietary period in years:", x)
@@ -603,7 +659,7 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         #observers = APO(specid)[2]
                         #reducers = APO(specid)[3]
 
-                        obsdate = str(a['data']['observed_at'].split('T')[0])+' '+str(a['data']['observed_at'].split('T')[1])
+                        obsdate = a['data']['observed_at'].replace('T', ' ')
 
                         classificationReport = TNSClassificationReport()
                         classificationReport.name = get_IAUname(ztfname)[3:]
@@ -626,28 +682,27 @@ def class_submission(sources, tns_names, classifys, class_dates):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                        pprint(classificationReport.fill(), tab='  ')
+                    pprint(classificationReport.fill(), tab='  ')
+                    proceed = input("\nProceed with classification and upload? ([y]/n) : ")
+                    if proceed == 'y' and not proceed.strip() == '':
 
-                        proceed = input("\nProceed with classification and upload? ([y]/n) : ")
-                        if proceed == 'y' and not proceed.strip() == '':
+                        #ASCII FILE UPLOAD
+                        print ("\n")
+                        response = upload_to_TNS(files)
+                        print (response)
 
-                            #ASCII FILE UPLOAD
-                            print ("\n")
-                            response = upload_to_TNS(files)
-                            print (response)
+                        if not response:
+                            print("File upload didn't work")
+                            print(response)
+                            #return False
 
-                            if not response:
-                                print("File upload didn't work")
-                                print(response)
-                                #return False
+                        print(response['id_code'], response['id_message'],
+                              "\nSuccessfully uploaded ascii spectrum")
+                        #classificationReport.asciiName = response['data'][-1]
 
-                            print(response['id_code'], response['id_message'],
-                                  "\nSuccessfully uploaded ascii spectrum")
-                            #classificationReport.asciiName = response['data'][-1]
-
-                            report_id = tns_classify(classificationReport)
-                            if tns_feedback(report_id) == True:
-                                post_comment(ztfname, 'Uploaded to TNS')
+                        report_id = tns_classify(classificationReport)
+                        if tns_feedback(report_id) == True:
+                            post_comment(ztfname, 'Uploaded to TNS')
 
 def check_TNS_class(ztfname):
 
@@ -796,6 +851,16 @@ def get_all_spectra_len(ztfname):
     response = api('GET',url)
     return len(response['data']['spectra'])
 
+def get_user(user_id):
+    resp = api('GET', 'https://fritz.science/api/user/'+str(user_id))
+
+    data = resp['data']
+
+    user_first = data['first_name']
+    user_last = data['last_name']
+
+    return user_first[0] + '. ' + user_last
+
 def get_classification(ztfname, man=False):
 
     ''' Info : Query the classification and classification date for any source
@@ -812,12 +877,14 @@ def get_classification(ztfname, man=False):
         classification = "No Classification found"
         probability = "None"
         classification_date = "None"
+        user = 'None'
 
     elif (len(output)==1):
 
         classification = response['data'][0]['classification']
         probability = response['data'][0]['probability']
         classification_date = response['data'][0]['created_at'].split('T')[0]
+        user = get_user(response['data'][0]['author_id'])
 
         if man == True:
 
@@ -832,12 +899,14 @@ def get_classification(ztfname, man=False):
                     classification = classification
                     probability =  probability
                     classification_date = classification_date
+                    user = user
 
         else:
 
             classification = classification
             probability =  probability
             classification_date = classification_date
+            user = user
 
     elif (len(output) > 1):
 
@@ -845,17 +914,20 @@ def get_classification(ztfname, man=False):
         classification_date = []
         classification_mjd = []
         probability = []
+        user = []
 
         for i in range (len(output)):
 
             classify = response['data'][i]['classification']
             classify_date = response['data'][i]['created_at']
             prob = response['data'][i]['probability']
+            us = get_user(response['data'][i]['author_id'])
 
             classification.append(classify)
             probability=np.append(probability, prob)
             classification_date.append(classify_date)
             classification_mjd.append(Time(classify_date, format='isot', scale='utc').mjd)
+            user.append(us)
 
         if man == True:
 
@@ -876,19 +948,22 @@ def get_classification(ztfname, man=False):
                     classification = classification[int(user_input)-1]
                     probability = probability[int(user_input)-1]
                     classification_date = classification_date[int(user_input)-1].split('T')[0]
+                    user = get_user(response['data'][int(user_input)-1]['author_id'])
             else:
 
                 classification = classification[int(user_input)-1]
                 probability = probability[int(user_input)-1]
                 classification_date = classification_date[int(user_input)-1].split('T')[0]
+                user = get_user(response['data'][int(user_input)-1]['author_id'])
 
         else:
 
             classification = classification[np.argmax(classification_mjd)]
             probability = probability[np.argmax(classification_mjd)]
             classification_date = classification_date[np.argmax(classification_mjd)].split('T')[0]
+            user = get_user(response['data'][np.argmax(classification_mjd)]['author_id'])
 
-    return classification, probability, classification_date
+    return classification, probability, classification_date, user
 
 def get_IAUname(ztfname):
 
@@ -903,20 +978,27 @@ def get_IAUname(ztfname):
     while True:
 
         try:
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=10)
 
             if response.status_code != 429:
-                break
+                pass
+
+        except requests.exceptions.Timeout:
+            print('Timeout...')
+            continue
 
         except requests.exceptions.ConnectionError:
             continue
 
         try:
-            json.loads(response.text)
+            json.loads(response.text)['data']
             break
 
         except json.decoder.JSONDecodeError:
             continue
+
+        except KeyError:
+            print(response.text)
 
     if response.status_code != 404 and 'cross_matches' in json.loads(response.text)['data'].keys() and len(json.loads(response.text)['data']['cross_matches']['TNS']) != 0:
         return json.loads(response.text)['data']['cross_matches']['TNS'][0]['name']
@@ -963,7 +1045,7 @@ def get_number(group_id, date):
 
     page = 1
     while True:
-        url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id+'&numPerPage=500&pageNumber='+str(page)+'&savedAfter='+date+'T00:00:00.000001'
+        url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id+'&numPerPage=50&pageNumber='+str(page)+'&savedAfter='+date+'T00:00:00.000001'
         response = api('GET',url)
 
         if len(response['data']['sources']) == 0:
@@ -1152,8 +1234,16 @@ def get_source_api(ztfname):
                   includes redshift, classification, comments, etc.)
     '''
     url = BASEURL+'api/sources/'+ztfname+'?includeComments=true'
-    response = api('GET',url, timeout=None)
-    return response['data']
+
+    while True:
+        try:
+            response = api('GET',url, timeout=30)
+            return response['data']
+        except KeyError:
+            continue
+        except requests.exceptions.Timeout:
+            print('Timeout...')
+            continue
 
 def get_source_file(outfile, since):
 
@@ -1201,13 +1291,9 @@ def get_TNS_instrument_ID(inst):
         Returns : TNS instrument ID
     '''
 
-    inst_ids = {'DBSP':1, 'ALFOSC': 41, 'LRIS': 3, 'DIS': 70, 'SEDM': 149, 'SPRAT': 156, 'GMOS': 6, 'Lick-3m': 10, 'LFC': 2, 'TSPEC': 109}
+    inst_ids = {'DBSP':1, 'ALFOSC': 41, 'LRIS': 3, 'DIS': 70, 'SEDM': 149, 'SPRAT': 156, 'GMOS': 6, 'Lick-3m': 10, 'LFC': 2, 'TSPEC': 109, 'NIRES': 252, 'GMOS_GS': 9}
 
-    #keys = np.array(class_ids.keys())
-    for keys in inst_ids:
-        if (keys == inst):
-            instkey = inst_ids[keys]
-            return instkey
+    return inst_ids[inst]
 
 def get_total_number_of_sources(group_id):
     ''' Info : Query total number of sources saved in a group
@@ -1265,6 +1351,7 @@ def read_ascii(f, startd):
     classifys_r = np.asarray(f['Classification'])
     class_dates_r = np.asarray(f['Classification Date'])
     reds_r = np.asarray(f['redshift'])
+    users_r = np.asarray(f['user'])
 
     sources = np.array([])
     tns_names = np.array([])
@@ -1272,6 +1359,7 @@ def read_ascii(f, startd):
     classifys = np.array([])
     class_dates = np.array([])
     reds = np.array([])
+    users = np.array([])
     unclassifys = np.array([])
 
     for i in np.arange(0,len(sources_r)):
@@ -1282,10 +1370,11 @@ def read_ascii(f, startd):
             classifys = np.append(classifys, classifys_r[i])
             class_dates = np.append(class_dates, class_dates_r[i])
             reds = np.append(reds, str(reds_r[i]))
+            users = np.append(users, users_r[i])
         if classifys_r[i] == 'No Classification found' and datetime.datetime.strptime(savedates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd:
             unclassifys = np.append(unclassifys, sources_r[i])
 
-    return sources, tns_names, savedates, classifys, class_dates, reds, unclassifys
+    return sources, tns_names, savedates, classifys, class_dates, reds, users, unclassifys
 
 def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - datetime.timedelta(days=180))):
 
@@ -1303,22 +1392,23 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
     class_date = []
     TNS = []
     reds = []
+    users = []
 
     listdir = os.getcwd()
     f = open (listdir+'/'+outfile+'.ascii','w')
-    f.write('Source Name'+'\t'+'TNS Name'+'\t'+'Saved Date'+'\t'+'Classification'+'\t'+'Classification Date'+'\t'+'redshift'+'\n')
+    f.write('Source Name'+'\t'+'TNS Name'+'\t'+'Saved Date'+'\t'+'Classification'+'\t'+'Classification Date'+'\t'+'redshift'+'\t'+'user'+'\t'+'\n')
 
     groupnum = input('Enter in Group ID: ')
 
     num_tot = get_number(groupnum, dat)
     #print(num_tot)
 
-    num_pages = int(num_tot/500) + 1
+    num_pages = int(num_tot/50) + 1
     #print(num_pages)
 
-    for page in range(num_pages):
+    for page in tqdm(range(num_pages), desc='Total Progress', position=0):
 
-        path = 'https://fritz.science/api/sources?group_ids=' + groupnum + '&saveSummary=true&numPerPage=500&pageNumber='+str(page+1)+'&savedAfter='+str(dat)+'T00:00:00.000001'
+        path = 'https://fritz.science/api/sources?group_ids=' + groupnum + '&saveSummary=true&numPerPage=50&pageNumber='+str(page+1)+'&savedAfter='+str(dat)+'T00:00:00.000001'
 
         #print(path)
 
@@ -1327,11 +1417,11 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
         if len(response['data']['sources']) == 0:
             break
 
-        for i in tqdm(range(len(response['data']['sources'])), desc='Page ' + str(page+1) + ' of ' + str(num_pages)):
+        for i in tqdm(range(len(response['data']['sources'])), desc='Page ' + str(page+1) + ' of ' + str(num_pages), position=1, leave=False):
 
             source_name = response['data']['sources'][i]['obj_id']
             saved_date = response['data']['sources'][i]['saved_at']
-            classification, prob, date = get_classification(source_name)
+            classification, prob, date, user = get_classification(source_name)
             IAU = get_IAUname(source_name)
             red = str(get_redshift(source_name))
 
@@ -1343,12 +1433,13 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
             classify.append(classification)
             class_date.append(date.split('T')[0])
             reds.append(red)
+            users.append(user)
 
-    output = sorted(zip(class_date, srcs, TNS, dates, classify, reds), reverse=True)
+    output = sorted(zip(class_date, srcs, TNS, dates, classify, reds, users), reverse=True)
 
     for i in range(num_tot):
 
-        f.write(output[i][1]+'\t'+output[i][2]+'\t'+output[i][3]+'\t'+output[i][4]+'\t'+output[i][0]+'\t'+output[i][5]+'\n')
+        f.write(output[i][1]+'\t'+output[i][2]+'\t'+output[i][3]+'\t'+output[i][4]+'\t'+output[i][0]+'\t'+output[i][5]+'\t'+output[i][6]+'\n')
 
     f.close()
 
@@ -1468,7 +1559,12 @@ def upload_to_TNS(filename, base_url = upload_url, api_key = API_KEY, filetype='
                                'application/fits'))]
 
     if filename:
-        response = requests.post(url, headers=headers, data=data, files=files)
+        while True:
+            try:
+                response = requests.post(url, headers=headers, data=data, files=files, timeout=30)
+                break
+            except requests.exceptions.Timeout:
+                continue
         try:
             return response.json()
         except:
@@ -1503,7 +1599,9 @@ def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
     a = get_spectrum_api(specid)
 
     inst = (a['data']['instrument_name'])
+
     #print(inst)
+    #print(a['data'].keys())
 
     if inst == 'SEDM':
 
@@ -1522,12 +1620,13 @@ def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
 
     elif inst == 'SPRAT':
 
-
         header = (a['data']['altdata'])
 
+        if len(header) > 0:
+            s = (ztfname+'_'+str(header['OBSDATE'].split('T')[0])+'_'+str(inst)+'.ascii')
 
-
-        s = (ztfname+'_'+str(header['OBSDATE'].split('T')[0])+'_'+str(inst)+'.ascii')
+        else:
+            s = (ztfname+'_'+str(a['data']['observed_at'].split('T')[0])+'_'+str(a['data']['instrument_name'])+'.ascii')
 
         with open(path+'/data/'+s,'w') as f:
             f.write(a['data']['original_file_string'])
@@ -1626,15 +1725,13 @@ def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
         spectrum_name = s
 
 
-    elif inst == 'LRIS':
+    elif inst == 'LRIS' or inst == 'NIRES' or inst == 'GMOS_GS':
 
         wav = (a['data']['wavelengths'])
         flux = (a['data']['fluxes'])
         err = (a['data']['errors'])
 
         OBSDATE = a['data']['observed_at'].split('T')[0]
-
-
 
         s = (ztfname+'_'+str(OBSDATE)+'_'+str(inst)+'.ascii')
 

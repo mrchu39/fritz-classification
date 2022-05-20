@@ -105,6 +105,12 @@ def pull_class(startd):
             classifications.append(df['annotations'][d][0]['value'])
             class_users.append(df['links'][d]['user'])
 
+            if df['links'][d]['user'] == '2456657' and news[int(np.argwhere(np.array(sub_ids) == df['links'][d]['subjects'][0]))] == 'ZTF22aagyuao':
+                pd.set_option('display.max_columns', None)
+                pd.set_option('display.width', None)
+                pd.set_option('display.max_colwidth', -1)
+                #print(str(df.iloc[[d]]))
+
     classifications = [int(0 if value is None else value) for value in classifications]
 
     sources = np.unique(class_sources)
@@ -119,8 +125,12 @@ def pull_class(startd):
 
         for m in stats.mode(un_class).mode:
             if m > 0:
+                #print(class_users)
+                #print(un_class)
+                #print(m)
                 images_available = True
                 image_url = image_urls[int(np.argwhere(np.array(news) == new))][m-1]['image/png']
+                #print(image_url)
                 rlap = all_rlaps[int(np.argwhere(np.array(news) == new))][m-1]
                 img_data = requests.get(image_url).content
                 with open('zooniverse/' + new + '.png', 'wb') as handler:
@@ -171,9 +181,15 @@ def pull_class(startd):
             elif upload == 'Ia-csm':
                 upload = 'Ia-CSM'
 
-            if 'II' not in upload or rlap < 9: # We only upload classification to Fritz if Type II and rlap > 9
+            if 'II' not in upload or rlap < 5: # We only upload classification to Fritz if Type II and rlap > 5
+
+                if 'II' not in upload:
+                    print('Not a Type II, skipping...')
+                elif rlap < 5:
+                    print('rlap < 5, skipping...')
+
                 resp = post_comment(new, 'zooniverse classification: ' + upload + ', ' + str(stats.mode(un_class).count) + '/' + str(len(un_class)) +
-                    ' classifications', 'zooniverse/'+new+'.png', new+'_zooniverse.png')
+                    ' classifications with rlap = ' + str(rlap), 'zooniverse/'+new+'.png', new+'_zooniverse.png')
 
                 continue
 
@@ -184,14 +200,21 @@ def pull_class(startd):
             match = input('Does the superfit classification match SNID? [y/n] ')
 
             if match != 'y':
+
+                print('No match, commenting classification')
+
+                resp = post_comment(new, 'zooniverse classification: ' + upload + ', ' + str(stats.mode(un_class).count) + '/' + str(len(un_class)) +
+                    ' classifications with rlap = ' + str(rlap), 'zooniverse/'+new+'.png', new+'_zooniverse.png')
+
                 continue
 
             pre_class = get_classification(new)[0]
+
             if pre_class == upload:
                 print(new + ' already classified with the same classification on Fritz.')
                 #subject_set.remove(news_ids[n])
                 continue
-            elif pre_class != 'Not Classified':
+            elif pre_class != 'No Classification found':
                 if input(new + ' already classified with classification ' + pre_class + '. Submit another? [y/n] ') == 'y':
                     pass
                 else:

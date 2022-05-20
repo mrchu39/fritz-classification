@@ -34,6 +34,7 @@ def run_superfit(source):
     redshift = get_redshift(source)
 
     if fname == 'No Spectra Found' or fname == 'Resuming...': # Return None if no spectrum on Fritz or if user prompts to continue
+        os.chdir(home)
         return
 
     with open('parameters.json') as f: # Load parameters for superfit into dictionary, then modify for given source

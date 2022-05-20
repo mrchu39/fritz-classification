@@ -65,9 +65,9 @@ else:
         since = input('Enter earliest date to download sources from (YYYY-MM-DD) or enter nothing to set it to 6 months ago: ')
         get_source_file('RCF_sources', since)
 
-f = ascii.read("RCF_sources.ascii") #ascii file containing the names of sources and their saved dates
+f = ascii.read("RCF_sources.ascii", delimiter='\t') #ascii file containing the names of sources and their saved dates
 
-sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Parses data from ASCII file according to previous input
+sources, tns_names, savedates, classifys, class_dates, reds, users, unclassifys = read_ascii(f, startd) # Parses data from ASCII file according to previous input
 
 option = ''
 while option != 0: # Select options
@@ -94,11 +94,11 @@ while option != 0: # Select options
         if len(unclassifys) == 0:
             print('There are no unclassified sources since the date entered.')
         else:
-            print(str(len(unclassifys)) + ' unclassified transients on Fritz have been saved. Would you like to classify them? [y/n] ')
+            print(str(len(unclassifys)) + ' unclassified transients on Fritz have been saved.')
 
             submit_class(unclassifys, f)
 
-            sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Reload RCF source file with newly classified transients
+            sources, tns_names, savedates, classifys, class_dates, reds, users, unclassifys = read_ascii(f, startd) # Reload RCF source file with newly classified transients
 
     if option == 3 or option == 'all':
 
@@ -126,6 +126,6 @@ while option != 0: # Select options
 
         print('There are ' + str(len(sources)) + ' objects saved or classified later than ' + str(startd) + ' with classifications.')
 
-        class_submission(sources, tns_names, classifys, class_dates) # Runs TNS submission script
+        class_submission(sources, tns_names, classifys, class_dates, users) # Runs TNS submission script
 
 print('Submission complete. Goodbye!')

@@ -375,7 +375,7 @@ def snid_analyze(source):
         print(source + ' already submitted to Zooniverse within the last 6 months.')
         return None, None, None, None
 
-    fname = write_ascii_file(source, path=os.getcwd(), auto=False)[0] # Downloads spectrum data in ASCII from Fritz
+    fname = write_ascii_file(source, path=os.getcwd(), auto=True)[0] # Downloads spectrum data in ASCII from Fritz
 
     if fname == 'No Spectra Found' or fname == 'Resuming...': # Return None if no spectrum on Fritz or if user prompts to continue
         return None, None, None, None

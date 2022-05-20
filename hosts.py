@@ -79,7 +79,13 @@ def cross_ref_NED(ra, dec):
     '''
 
     co = coordinates.SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg), frame='icrs')
-    result_table = Ned.query_region(co, radius=3*u.arcsec)
+
+    while True:
+        try:
+            result_table = Ned.query_region(co, radius=3*u.arcsec)
+            break
+        except requests.exceptions.ConnectTimeout:
+            continue
 
     # Gets rid of any objects if they're stars, or have 'SN' or 'AT' in they're name (i.e. they're SNe)
     non_stars = np.array([True if ('*' not in result_table['Type'][t] and result_table['Type'][t] != 'SN' and
@@ -128,7 +134,13 @@ def cross_ref_SDSS(ra, dec):
     '''
 
     co = coordinates.SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg), frame='icrs')
-    result_table = SDSS.query_region(co, radius=3*u.arcsec)
+
+    while True:
+        try:
+            result_table = SDSS.query_region(co, radius=3*u.arcsec)
+            break
+        except requests.exceptions.ReadTimeout:
+            continue
 
     if result_table == None:
         return None, None, None, None, None
