@@ -34,7 +34,7 @@ In most cases, you will want to look for newly classified or saved transients fr
 
 ### -1. Zooniverse Classifications
 
-The code will then ask whether you would like to pull classifications from Zooniverse. If you select yes, all objects with more than 11 classifications retired from the inputted date will be pulled. If those objects have a classification that a majority agree with, it will prompt the user to input the classification. **Enter it as it appears on the image displayed**. If it is a Type II and the rlap score from when SNID ran on it is >9, Superfit will run. If the identified type on Superfit agrees, the user will indicate that this is the case and the object will be formally classified on Fritz. If not, a comment will be submitted with this information.
+The code will then ask whether you would like to pull classifications from Zooniverse. If you select yes, all objects with more than 11 classifications retired from the inputted date will be pulled. If those objects have a classification that a majority agree with, it will prompt the user to input the classification. **Enter it as it appears on the image displayed**. If it is a Type II and the rlap score from when SNID ran on it is >5, Superfit will run. If the identified type on Superfit agrees, the user will indicate that this is the case and the object will be formally classified on Fritz. If not, a comment will be submitted with this information.
 
 This is before the rest of the procedure because if you submit classifications to Fritz, you want it to be updated before you submit reports to TNS.
 
