@@ -108,9 +108,14 @@ After completing all in the list, the script will indicate that the submission p
 
 ## Changelog
 
+### 2022-05-20
+
+- Fixes for reducing strain on Fritz by requesting in batches of 50 rather than 500.
+- Changes TNS reports such that classifiers are credited first.
+
 ### 2022-04-03
 
-- Added in rlap cutoff of 9 for uploading classifications.
+- Added in rlap cutoff of 5 for uploading classifications.
 - Minor improvements.
 
 ### 2022-02-07
