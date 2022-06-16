@@ -16,3 +16,4 @@ lxml
 tqdm
 ztfquery
 iminuit
+time
