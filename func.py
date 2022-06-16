@@ -12,6 +12,7 @@ import pytz
 import re
 import requests
 import sys, getopt, argparse
+import time
 import warnings
 import webbrowser as wb
 import xlsxwriter
@@ -158,11 +159,15 @@ def api(method, endpoint, data=None, params=None, timeout=10):
             response = requests.request(method, endpoint, json=data, headers=headers, params=params, timeout=timeout)
             re_dict = response.json()
 
-            if '429 Too Many Requests' not in response.text:
-                return re_dict
-            else:
-                #print('429')
+            if '429 Too Many Requests' in response.text:
                 continue
+
+            if json.loads(response.text)['status'] == 'error' and json.loads(response.text)['message'] == 'System provisioning':
+                print('System provisioning...')
+                time.sleep(10)
+                continue
+
+            return re_dict
         except requests.exceptions.Timeout:
             print('Timeout Exception, restarting...')
             continue
@@ -327,7 +332,14 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
                         classificationReport.expTime = (header['EXPTIME'])
                         classificationReport.observers = 'SEDmRobot'
-                        classificationReport.reducers = (header['REDUCER'])
+
+                        reducers = []
+
+                        for r in a['data']['reducers']:
+                            reducers.append(str(r['first_name'])+' '+str(r['last_name']))
+
+                        classificationReport.reducers = ', '.join(map(str, reducers))
+
                         classificationReport.specTypeID = spectype_id
                         classificationReport.spectrumComments = spec_comments
                         classificationReport.groupID = source_group
@@ -336,7 +348,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
 
                     if inst == 'SPRAT':
 
-                        auths = np.array(['D. Perley (LJMU)', 'M. Chu', 'A. Dahiwale', 'C. Fremling']) ### Change accordingly
+                        auths = np.array(['D. Perley (LJMU)', 'M. Chu', 'K. R. Hinds', 'C. Fremling']) ### Change accordingly
 
                         if name != 'S. ZTF':
                             flag_1 = 0
@@ -426,8 +438,21 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.obsDate = obsdate
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
                         classificationReport.expTime = (header['EXPTIME'])
-                        classificationReport.observers = (str(a['data']['observers'][0]['first_name'])+' '+str(a['data']['observers'][0]['last_name']))
-                        classificationReport.reducers = (str(a['data']['reducers'][0]['first_name'])+' '+str(a['data']['reducers'][0]['last_name']))
+
+                        observers = []
+
+                        for o in a['data']['observers']:
+                            observers.append(str(o['first_name'])+' '+str(o['last_name']))
+
+                        classificationReport.observers = ', '.join(map(str, observers))
+
+                        reducers = []
+
+                        for r in a['data']['reducers']:
+                            reducers.append(str(r['first_name'])+' '+str(r['last_name']))
+
+                        classificationReport.reducers = ', '.join(map(str, reducers))
+
                         classificationReport.specTypeID = spectype_id
                         classificationReport.spectrumComments = spec_comments
                         classificationReport.groupID = source_group
@@ -474,8 +499,21 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.obsDate = obsdate
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
                         #classificationReport.expTime = '900'
-                        classificationReport.observers = (str(a['data']['observers'][0]['first_name'])+' '+str(a['data']['observers'][0]['last_name']))
-                        classificationReport.reducers = (str(a['data']['reducers'][0]['first_name'])+' '+str(a['data']['reducers'][0]['last_name']))
+
+                        observers = []
+
+                        for o in a['data']['observers']:
+                            observers.append(str(o['first_name'])+' '+str(o['last_name']))
+
+                        classificationReport.observers = ', '.join(map(str, observers))
+
+                        reducers = []
+
+                        for r in a['data']['reducers']:
+                            reducers.append(str(r['first_name'])+' '+str(r['last_name']))
+
+                        classificationReport.reducers = ', '.join(map(str, reducers))
+
                         classificationReport.specTypeID = spectype_id
                         classificationReport.spectrumComments = spec_comments
                         classificationReport.groupID = source_group
@@ -524,8 +562,21 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.obsDate = OBSDATE
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
                         classificationReport.expTime = '300'
-                        classificationReport.observers = (str(a['data']['observers'][0]['first_name'])+' '+str(a['data']['observers'][0]['last_name']))
-                        classificationReport.reducers = (str(a['data']['reducers'][0]['first_name'])+' '+str(a['data']['reducers'][0]['last_name']))
+
+                        observers = []
+
+                        for o in a['data']['observers']:
+                            observers.append(str(o['first_name'])+' '+str(o['last_name']))
+
+                        classificationReport.observers = ', '.join(map(str, observers))
+
+                        reducers = []
+
+                        for r in a['data']['reducers']:
+                            reducers.append(str(r['first_name'])+' '+str(r['last_name']))
+
+                        classificationReport.reducers = ', '.join(map(str, reducers))
+
                         classificationReport.specTypeID = spectype_id
                         classificationReport.spectrumComments = spec_comments
                         classificationReport.groupID = source_group
@@ -574,8 +625,21 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.obsDate = OBSDATE
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
                         #classificationReport.expTime = '300'
-                        classificationReport.observers = (str(a['data']['observers'][0]['first_name'])+' '+str(a['data']['observers'][0]['last_name']))
-                        classificationReport.reducers = (str(a['data']['reducers'][0]['first_name'])+' '+str(a['data']['reducers'][0]['last_name']))
+
+                        observers = []
+
+                        for o in a['data']['observers']:
+                            observers.append(str(o['first_name'])+' '+str(o['last_name']))
+
+                        classificationReport.observers = ', '.join(map(str, observers))
+
+                        reducers = []
+
+                        for r in a['data']['reducers']:
+                            reducers.append(str(r['first_name'])+' '+str(r['last_name']))
+
+                        classificationReport.reducers = ', '.join(map(str, reducers))
+
                         classificationReport.specTypeID = spectype_id
                         classificationReport.spectrumComments = spec_comments
                         classificationReport.groupID = source_group
@@ -624,8 +688,85 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.obsDate = OBSDATE
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
                         #classificationReport.expTime = '300'
-                        classificationReport.observers = (str(a['data']['observers'][0]['first_name'])+' '+str(a['data']['observers'][0]['last_name']))
-                        classificationReport.reducers = (str(a['data']['reducers'][0]['first_name'])+' '+str(a['data']['reducers'][0]['last_name']))
+
+                        observers = []
+
+                        for o in a['data']['observers']:
+                            observers.append(str(o['first_name'])+' '+str(o['last_name']))
+
+                        classificationReport.observers = ', '.join(map(str, observers))
+
+                        reducers = []
+
+                        for r in a['data']['reducers']:
+                            reducers.append(str(r['first_name'])+' '+str(r['last_name']))
+
+                        classificationReport.reducers = ', '.join(map(str, reducers))
+
+                        classificationReport.specTypeID = spectype_id
+                        classificationReport.spectrumComments = spec_comments
+                        classificationReport.groupID = source_group
+                        classificationReport.spec_proprietary_period_value = proprietary_period
+                        classificationReport.spec_proprietary_period_units = proprietary_units
+
+                    if inst == 'FLOYDS':
+
+                        auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
+
+                        if name != 'S. ZTF':
+                            flag_1 = 0
+                            for au, auth in enumerate(auths):
+                                if name in auth:
+                                    auths = np.append(name, np.delete(auths, au))
+                                    flag_1 = 1
+                                    break
+
+                            if flag_1 == 0:
+                                auths = np.append(name, auths)
+
+                        classifiers = ', '.join(map(str, auths)) + ' on behalf of the Zwicky Transient Facility (ZTF)'
+                        source_group = 48 ### Require source group id from drop down list, 0 is for None
+                        spectypes = np.array(['object','host','sky','arcs','synthetic'])
+
+                        header = (a['data']['altdata'])
+
+                        #proprietary_period = int(input("Proprietary period in years:", x)
+                        proprietary_period = '0'
+                        proprietary_units = "years"
+                        spec_comments =''
+                        classification_comments = ''
+                        spectype='object'
+                        spectype_id = ['object', 'host', 'sky', 'arcs', 'synthetic'].index(spectype) + 1
+
+                        OBSDATE = a['data']['observed_at'].replace('T', ' ')
+
+                        classificationReport = TNSClassificationReport()
+                        classificationReport.name = get_IAUname(ztfname)[3:]
+                        classificationReport.fitsName = ''
+                        classificationReport.asciiName = spectrum_name
+                        classificationReport.classifierName = classifiers
+                        classificationReport.classificationID = get_TNS_classification_ID(classify)
+                        classificationReport.redshift = get_redshift(ztfname)
+                        classificationReport.classificationComments = classification_comments
+                        classificationReport.obsDate = OBSDATE
+                        classificationReport.expTime = (header['EXPTIME']['value'])
+                        classificationReport.instrumentID = get_TNS_instrument_ID(inst)
+                        #classificationReport.expTime = '300'
+
+                        observers = []
+
+                        for o in a['data']['observers']:
+                            observers.append(str(o['first_name'])+' '+str(o['last_name']))
+
+                        classificationReport.observers = ', '.join(map(str, observers))
+
+                        reducers = []
+
+                        for r in a['data']['reducers']:
+                            reducers.append(str(r['first_name'])+' '+str(r['last_name']))
+
+                        classificationReport.reducers = ', '.join(map(str, reducers))
+
                         classificationReport.specTypeID = spectype_id
                         classificationReport.spectrumComments = spec_comments
                         classificationReport.groupID = source_group
@@ -678,8 +819,21 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         #classificationReport.expTime = exptime
                         #classificationReport.observers = observers
                         #classificationReport.reducers = reducers
-                        classificationReport.observers = (str(a['data']['observers'][0]['first_name'])+' '+str(a['data']['observers'][0]['last_name']))
-                        classificationReport.reducers = (str(a['data']['reducers'][0]['first_name'])+' '+str(a['data']['reducers'][0]['last_name']))
+
+                        observers = []
+
+                        for o in a['data']['observers']:
+                            observers.append(str(o['first_name'])+' '+str(o['last_name']))
+
+                        classificationReport.observers = ', '.join(map(str, observers))
+
+                        reducers = []
+
+                        for r in a['data']['reducers']:
+                            reducers.append(str(r['first_name'])+' '+str(r['last_name']))
+
+                        classificationReport.reducers = ', '.join(map(str, reducers))
+
                         classificationReport.specTypeID = spectype_id
                         classificationReport.spectrumComments = spec_comments
                         classificationReport.groupID = source_group
@@ -856,6 +1010,7 @@ def get_all_spectra_len(ztfname):
     return len(response['data']['spectra'])
 
 def get_user(user_id):
+
     resp = api('GET', 'https://fritz.science/api/user/'+str(user_id))
 
     data = resp['data']
@@ -1295,7 +1450,7 @@ def get_TNS_instrument_ID(inst):
         Returns : TNS instrument ID
     '''
 
-    inst_ids = {'DBSP':1, 'ALFOSC': 41, 'LRIS': 3, 'DIS': 70, 'SEDM': 149, 'SPRAT': 156, 'GMOS': 6, 'Lick-3m': 10, 'LFC': 2, 'TSPEC': 109, 'NIRES': 252, 'GMOS_GS': 9}
+    inst_ids = {'DBSP':1, 'ALFOSC': 41, 'LRIS': 3, 'DIS': 70, 'SEDM': 149, 'SPRAT': 156, 'GMOS': 6, 'Lick-3m': 10, 'LFC': 2, 'TSPEC': 109, 'NIRES': 252, 'GMOS_GS': 9, 'FLOYDS': 125}
 
     return inst_ids[inst]
 
@@ -1729,7 +1884,7 @@ def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
         spectrum_name = s
 
 
-    elif inst == 'LRIS' or inst == 'NIRES' or inst == 'GMOS_GS':
+    elif inst == 'LRIS' or inst == 'NIRES' or inst == 'GMOS_GS' or inst == 'FLOYDS':
 
         wav = (a['data']['wavelengths'])
         flux = (a['data']['fluxes'])
