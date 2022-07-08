@@ -290,6 +290,8 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
 
                     inst = (a['data']['instrument_name'])
 
+                    #pprint(a['data']['altdata'])
+
                     if inst == 'SEDM':
 
                         auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
@@ -437,7 +439,9 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = obsdate
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
-                        classificationReport.expTime = (header['EXPTIME'])
+
+                        if 'EXPTIME' in header.keys():
+                            classificationReport.expTime = (header['EXPTIME'])
 
                         observers = []
 
@@ -1139,14 +1143,16 @@ def get_IAUname(ztfname):
         try:
             response = requests.get(url, headers=headers, timeout=10)
 
-            if response.status_code != 429:
-                pass
+            if '429 Too Many Requests' in response.text:
+                continue
 
         except requests.exceptions.Timeout:
             print('Timeout...')
             continue
 
         except requests.exceptions.ConnectionError:
+            print('connection error')
+            print(response.text)
             continue
 
         try:
@@ -1154,9 +1160,16 @@ def get_IAUname(ztfname):
             break
 
         except json.decoder.JSONDecodeError:
+
+            if response.text == '':
+                print(ztfname + ' has no data on Fritz')
+                return 'Not reported to TNS'
+
+            print(response.text)
             continue
 
         except KeyError:
+            print('key error')
             print(response.text)
 
     if response.status_code != 404 and 'cross_matches' in json.loads(response.text)['data'].keys() and len(json.loads(response.text)['data']['cross_matches']['TNS']) != 0:
@@ -1184,10 +1197,13 @@ def get_IAUname(ztfname):
         except requests.exceptions.ConnectionError:
             continue
 
-        if json.loads(response_tns.text)['id_code'] == 429:
-            sleep(1)
-        else:
-            break
+        try:
+            if json.loads(response_tns.text)['id_code'] == 429:
+                sleep(1)
+            else:
+                break
+        except json.decoder.JSONDecodeError:
+            print(response_tns.text)
 
     if len(json.loads(response_tns.text)['data']['reply']) != 0:
         return json.loads(response_tns.text)['data']['reply'][0]['prefix'] + ' ' + json.loads(response_tns.text)['data']['reply'][0]['objname']
