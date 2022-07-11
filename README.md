@@ -14,6 +14,8 @@ Install the required Python packages with `pip install -r requirements.txt`.
 
 Installation of SNID is detailed on the above link. Ensure that its dependencies (PGPLOT) are installed. **You must download the correct templates for this application**. As they are too large to upload here, ask me for them. Installation of superfit is also detailed above, and the correct templates will also need to be installed. Enter in the location the SNID executable and Superfit Python files in the generated info file.
 
+Note about Superfit, I have changed a `run.py` in my installation such that the procces in the script are confined within a `run()` method. To make it work with my scripts, just enclose everything after the imports into a `def run():`.
+
 Generate your unique Fritz API token by going to your [profile](https://fritz.science/profile), finding "Generate New Token for Command-Line Authentication", entering in a name (this is not important), checking all the boxes, and clicking "generate token". Running the program for the first time will generate a file called `info.info`, enter in the API token where appropriate in the file. **Let the code generate the file, the string must be parsed correctly.**
 
 You will also need the ID and API key for the bot that submits information to TNS. Email mrchu@caltech.edu for them and enter them in `info.info` when generated. Enter this into `info.info` also.
