@@ -7,6 +7,7 @@ This tool pulls data from Fritz, uses SNID to classify transients, and uploads c
 * [SNID](https://people.lam.fr/blondin.stephane/software/snid/index.html)
 * [superfit](https://github.com/samanthagoldwasser25/superfit)
 * [ztfiaenv](https://github.com/MatSmithAstro/ztfiaenv/tree/main/ztfiaenv)
+* [pymage](https://github.com/MickaelRigault/pymage) (*don't use pip, it will install a different package*)
 
 ## Installation
 
