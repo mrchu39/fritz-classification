@@ -6,8 +6,8 @@ This tool pulls data from Fritz, uses SNID to classify transients, and uploads c
 * [Anaconda for Python 3.7+](https://www.anaconda.com/products/individual)
 * [SNID](https://people.lam.fr/blondin.stephane/software/snid/index.html)
 * [superfit](https://github.com/samanthagoldwasser25/superfit)
-* [ztfiaenv](https://github.com/MatSmithAstro/ztfiaenv/tree/main/ztfiaenv)
-* [pymage](https://github.com/MickaelRigault/pymage) (*don't use pip, it will install a different package*)
+* [ztfiaenv](https://github.com/MatSmithAstro/ztfiaenv/tree/main/ztfiaenv) (contact [Mat Smith](mailto:m.smith@ipnl.in2p3.fr) for access)
+* [pymage](https://github.com/MickaelRigault/pymage) (don't use pip, it will install a different package)
 
 ## Installation
 
@@ -22,6 +22,8 @@ Generate your unique Fritz API token by going to your [profile](https://fritz.sc
 You will also need the ID and API key for the bot that submits information to TNS. Email mrchu@caltech.edu for them and enter them in `info.info` when generated. Enter this into `info.info` also.
 
 You will also need to create a Zooniverse account with edit privileges for the Zwicky Chemical Factory project. The generated info file will have a space to enter in your Zooniverse credentials.
+
+Ensure that after ztfiaenv is installed, you set the appropriate global variables.
 
 ## Usage
 
