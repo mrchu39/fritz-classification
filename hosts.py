@@ -222,6 +222,13 @@ def get_host_info(ztfname):
         except FileNotFoundError:
             continue
 
+    if len(fitsurl) == 0:
+        plt.figure()
+
+        plt.savefig('test_host.png')
+
+        return hostname, hostra, hostdec, hosttype, redshift
+
     fh = fits.open(fitsurl[0])
     fim = fh[0].data
     wcs = WCS(fh[0].header)
@@ -295,17 +302,6 @@ def post_host(source):
         Returns : None
     '''
 
-    flag = 0
-    while flag == 0:
-        try:
-            hostname, hostra, hostdec, hosttype, redshift = get_host_info(source)
-            flag = 1
-        except requests.exceptions.ReadTimeout:
-            continue
-
-    if hostname == None:
-        return
-
     comment_infos = get_source_api(source)['comments']
 
     flag = 0
@@ -316,24 +312,19 @@ def post_host(source):
         comment = comment_info['text']
 
         if 'potential host:' in comment:
-            if comment.split(':')[1].split(',')[0].strip() != hostname:
-                if redshift != None:
-                    resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'potential host: '+hostname+', ra = '+str(hostra)+
-                        ', dec = '+str(hostdec)+', z = '+str(redshift)+', type = '+hosttype+'. host page: http://gayatri.caltech.edu:88/query/host/'+source, 'test_host.png', source+'_host.png')
-                else:
-                    resp = edit_comment(source, comment_info['id'], comment_info['author_id'], 'potential host: '+hostname+', ra = '+str(hostra)+
-                        ', dec = '+str(hostdec)+', type = '+hosttype+'. host page: http://gayatri.caltech.edu:88/query/host/'+source, 'test_host.png', source+'_host.png')
+            print(source + ' already has an associated host.')
+            return
 
-                if resp['status'] == 'success':
-                    print(bcolors.OKGREEN + source + ' host association update successful.' + bcolors.ENDC)
-                    return
-                else:
-                    print(bcolors.FAIL + source + ' host association update failed.' + bcolors.ENDC)
-                    print(bcolors.FAIL + json.dumps(resp, indent=2) + bcolors.ENDC)
-                    return
-            else:
-                print(source + ' already has an associated host.')
-                return
+    flag = 0
+    while flag == 0:
+        try:
+            hostname, hostra, hostdec, hosttype, redshift = get_host_info(source)
+            flag = 1
+        except requests.exceptions.ReadTimeout:
+            continue
+
+    if hostname == None:
+        return
 
     if redshift != None:
         resp = post_comment(source, 'potential host: '+hostname+', ra = '+str(hostra)+', dec = '+str(hostdec)+', z = '+str(redshift)+

@@ -348,7 +348,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                    if inst == 'SPRAT':
+                    elif inst == 'SPRAT':
 
                         auths = np.array(['D. Perley (LJMU)', 'M. Chu', 'K. R. Hinds', 'C. Fremling']) ### Change accordingly
 
@@ -399,7 +399,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                    if inst == 'ALFOSC':
+                    elif inst == 'ALFOSC':
 
                         auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
 
@@ -463,7 +463,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                    if inst == 'DBSP':
+                    elif inst == 'DBSP' or inst == 'KAST':
 
                         auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
 
@@ -524,7 +524,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                    if inst == 'LRIS':
+                    elif inst == 'LRIS':
 
                         auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
 
@@ -587,7 +587,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                    if inst == 'NIRES':
+                    elif inst == 'NIRES':
 
                         auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
 
@@ -650,7 +650,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                    if inst == 'GMOS_GS':
+                    elif inst == 'GMOS_GS':
 
                         auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
 
@@ -713,7 +713,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                    if inst == 'FLOYDS':
+                    elif inst == 'FLOYDS':
 
                         auths = np.array(['M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
 
@@ -777,7 +777,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
 
-                    if inst == 'DIS':
+                    elif inst == 'DIS':
 
                         auths = np.array(['M. Graham (UW)', 'M. Chu', 'A. Dahiwale', 'C. Fremling (Caltech)']) ### Change accordingly
 
@@ -843,6 +843,11 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         classificationReport.groupID = source_group
                         classificationReport.spec_proprietary_period_value = proprietary_period
                         classificationReport.spec_proprietary_period_units = proprietary_units
+
+                    else:
+
+                        print(inst + ' not in list of instruments, please add to code.')
+                        continue
 
                     pprint(classificationReport.fill(), tab='  ')
                     proceed = input("\nProceed with classification and upload? ([y]/n) : ")
@@ -1466,7 +1471,7 @@ def get_TNS_instrument_ID(inst):
         Returns : TNS instrument ID
     '''
 
-    inst_ids = {'DBSP':1, 'ALFOSC': 41, 'LRIS': 3, 'DIS': 70, 'SEDM': 149, 'SPRAT': 156, 'GMOS': 6, 'Lick-3m': 10, 'LFC': 2, 'TSPEC': 109, 'NIRES': 252, 'GMOS_GS': 9, 'FLOYDS': 125}
+    inst_ids = {'DBSP':1, 'ALFOSC': 41, 'LRIS': 3, 'DIS': 70, 'SEDM': 149, 'SPRAT': 156, 'GMOS': 6, 'Lick-3m': 10, 'LFC': 2, 'TSPEC': 109, 'NIRES': 252, 'GMOS_GS': 9, 'FLOYDS': 125, 'KAST': 10}
 
     return inst_ids[inst]
 

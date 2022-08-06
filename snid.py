@@ -491,6 +491,8 @@ def snid_analyze(source):
         types = np.unique(Top50["type"])
         top5Types = np.unique(Top5["type"])
 
+        print(Top5)
+
         row = []
         row.append(j[0] + ".ascii")
         row.append(j[0].split("_")[0])
