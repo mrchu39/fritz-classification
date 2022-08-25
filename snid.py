@@ -491,7 +491,7 @@ def snid_analyze(source):
         types = np.unique(Top50["type"])
         top5Types = np.unique(Top5["type"])
 
-        print(Top5)
+        #print(Top5)
 
         row = []
         row.append(j[0] + ".ascii")
@@ -604,6 +604,9 @@ def snid_analyze(source):
 
     sample_remaining = ZTable_best
 
+    for i in np.arange(1,6):
+        print(str(sample_remaining[0]['rank_' + str(i)]) + '\t' + str(sample_remaining[0]['sntemplate_' + str(i)]) + ' '*(14-len(str(sample_remaining[0]['sntemplate_' + str(i)]))) + '\t' + str(sample_remaining[0]['c_snid_' + str(i)]) + ' '*(10-len(str(sample_remaining[0]['c_snid_' + str(i)]))) + '\t' + str(sample_remaining[0]['rlap_' + str(i)]))
+
     top_5 = [int(sample_remaining['rank_1']), int(sample_remaining['rank_2']), int(sample_remaining['rank_3']), int(sample_remaining['rank_4']),
         int(sample_remaining['rank_5'])]
 
@@ -615,6 +618,8 @@ def snid_analyze(source):
         plot_best_5(datasource,output,spectra_name,z_snid, top_5, [sample_remaining['rlap_1'][0], sample_remaining['rlap_2'][0], sample_remaining['rlap_3'][0],
             sample_remaining['rlap_4'][0], sample_remaining['rlap_5'][0]], show_redshift = False)
         gc.collect()
+
+    #print(sample_remaining)
 
     try:
         data, result, fitted_model = model_lc(source) # Run light curve fitting on data

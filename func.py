@@ -237,6 +237,9 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                 flag = 1
                 continue
 
+            if comment == 'Do not upload to TNS':
+                print(ztfname + ' should NOT be uploaded to TNS.')
+
             if comment == 'Classification from TNS':
                 print(source + ' classified from TNS.')
                 flag = 1
