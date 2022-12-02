@@ -142,7 +142,7 @@ def cross_ref_SDSS(ra, dec):
         except requests.exceptions.ReadTimeout:
             continue
 
-    if result_table == None:
+    if type(result_table) != Table:
         return None, None, None, None, None
 
     closest = np.argmin(np.sqrt((ra-np.array(result_table['ra']))**2+(dec-np.array(result_table['dec']))**2))

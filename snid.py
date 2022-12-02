@@ -377,6 +377,10 @@ def snid_analyze(source):
 
     fname = write_ascii_file(source, path=os.getcwd(), auto=True)[0] # Downloads spectrum data in ASCII from Fritz
 
+    if fname == None:
+        print('Unable to read spectrum.')
+        return None, None, None, None
+
     if fname == 'No Spectra Found' or fname == 'Resuming...': # Return None if no spectrum on Fritz or if user prompts to continue
         return None, None, None, None
 
