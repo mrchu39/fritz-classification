@@ -72,7 +72,7 @@ def get_photometry(ztfname, format='flux'):
     elif format == 'mag':
         data = {'format': 'mag'}
 
-    response = api('GET', url, params=data, timeout=10)
+    status, response = api('GET', url, params=data, timeout=10)
 
     if format == 'flux':
 
@@ -128,7 +128,7 @@ def listComplementElements(list1, list2):
 
     return storeResults
 
-def model_lc(source):
+def model_lc(source, redshift):
 
     ''' Info : Fits photometry data to light curve using sncosmo.
         Input : source
@@ -137,7 +137,8 @@ def model_lc(source):
 
     data = get_photometry(source)
 
-    red, red_err = get_redshift(source, True)
+    red = redshift
+    red_err = 'No redshift error found'
     model = sncosmo.Model(source='salt2')
 
     if red != 'No redshift found':
@@ -173,10 +174,10 @@ def plot_box_spec(wave, flux):
 
     return wv_plot, flux_plot
 
-def post_lc(source):
+def post_lc(source, redshift):
 
     ''' Info : Posts LC data on Fritz as comment, along with nsigma for c and x1 and peak absolute magnitude. Plot is also attached.
-        Input : ZTFname
+        Input : ZTFname, redshift
         Returns : None
     '''
 
@@ -193,7 +194,7 @@ def post_lc(source):
             if int(comment[int(comment.index('n='))+2:].split(',')[0]) != len(data) or 'gayatri' not in comment: # Check if new photometry has been uploaded
 
                 try:
-                    dfit, result, fitted_model = model_lc(source)
+                    dfit, result, fitted_model = model_lc(source, redshift)
                 except RuntimeError:
                     print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC) # Did not converge on fit
                     return
@@ -237,7 +238,7 @@ def post_lc(source):
                 return
 
     try:
-        dfit, result, fitted_model = model_lc(source)
+        dfit, result, fitted_model = model_lc(source, redshift)
     except RuntimeError:
         print(bcolors.FAIL + 'sncosmo encountered runtime error. Skipping...' + bcolors.ENDC)
         return
@@ -298,7 +299,7 @@ def read_tables(files):
         matches.append(row)
     return matches, spectra
 
-def run_class(unclassifys):
+def run_class(unclassifys, unclassified_reds):
 
     ''' Info : Runs SNID analysis on list of sources
         Input : list of unclassified sources
@@ -337,7 +338,7 @@ def run_class(unclassifys):
 
     for s in np.arange(0,len(unclassifys)):
         print(bcolors.OKCYAN + str(s+1) + '/' + str(len(unclassifys)) + bcolors.ENDC + ': ' + bcolors.OKBLUE + unclassifys[s] + bcolors.ENDC)
-        t, f, r, re = snid_analyze(unclassifys[s])
+        t, f, r, re = snid_analyze(unclassifys[s], unclassified_reds[s])
 
         if t != None:
             if t == 'II':
@@ -363,11 +364,11 @@ def run_class(unclassifys):
 
     return transients, types, rlaps, reds, red_errs
 
-def snid_analyze(source):
+def snid_analyze(source, redshift):
 
     ''' Info : Runs SNID analysis on given source and returns classification data
                Saves output files in individual folders
-        Input : source
+        Input : source, redshift
         Returns : classification, rlap score, redshift, redshift error
     '''
 
@@ -449,8 +450,9 @@ def snid_analyze(source):
     Table_List = []
     sample_length = 1
     count = 0
+
     for i in file_list:
-        templates_list = Table.read(i, format = "ascii", data_start = 34, data_end = 200, names = ["no", "sn", "type", "lap", "rlap", "z", "zerr", "age", "age_flag", "grade"])
+        templates_list = Table.read(i, format = "ascii", data_start = 28, data_end = 200, names = ["no", "sn", "type", "lap", "rlap", "z", "zerr", "age", "age_flag", "grade"])
         new_i = i.split("/")[-2]
         Table_List.append([new_i, templates_list])
         count += 1
@@ -626,7 +628,7 @@ def snid_analyze(source):
     #print(sample_remaining)
 
     try:
-        data, result, fitted_model = model_lc(source) # Run light curve fitting on data
+        data, result, fitted_model = model_lc(source, redshift) # Run light curve fitting on data
 
         print('Fitted z is ' + str(np.round((result.parameters[0]-z)/z_std, 1)) + ' standard deviations from mean')
         print('Fitted x0 is ' + str(np.round((result.parameters[2]-x0)/x0_std, 1)) + ' standard deviations from mean')
@@ -783,14 +785,14 @@ def specplot(x, y, xi, yi, snid_type, fname, output, best_num, z_template, z_tem
     plt.close(fig)
     plt.close()
 
-def submit_class(unclassifys, f):
+def submit_class(unclassifys, unclassified_reds, f):
 
     ''' Info : Submits classification information to Fritz
         Input : list of sources without classifications
         Returns : None
     '''
 
-    transients, types, rlaps, reds, red_errs = run_class(unclassifys) # Runs SNID classification code
+    transients, types, rlaps, reds, red_errs = run_class(unclassifys, unclassified_reds) # Runs SNID classification code
 
     if len(transients) != 0:
         print('ZTFname\t\tClassification\t\tRedshift\t\trlaps')

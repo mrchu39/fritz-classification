@@ -67,7 +67,7 @@ else:
 
 f = ascii.read("RCF_sources.ascii", delimiter='\t') #ascii file containing the names of sources and their saved dates
 
-sources, tns_names, savedates, classifys, class_dates, reds, users, unclassifys = read_ascii(f, startd) # Parses data from ASCII file according to previous input
+sources, tns_names, savedates, classifys, class_dates, reds, users, unclassifys, unclassified_reds = read_ascii(f, startd) # Parses data from ASCII file according to previous input
 
 option = ''
 while option != 0: # Select options
@@ -85,7 +85,7 @@ while option != 0: # Select options
 
             submit_reds(sources[reds=='No redshift found'], f)
 
-            sources, tns_names, savedates, classifys, class_dates, reds, unclassifys = read_ascii(f, startd) # Reload RCF source file with transients with newly determined redshifts
+            sources, tns_names, savedates, classifys, class_dates, reds, unclassifys, unclassified_reds = read_ascii(f, startd) # Reload RCF source file with transients with newly determined redshifts
 
     if option == 2 or option == 'all':
 
@@ -96,19 +96,20 @@ while option != 0: # Select options
         else:
             print(str(len(unclassifys)) + ' unclassified transients on Fritz have been saved.')
 
-            submit_class(unclassifys, f)
+            submit_class(unclassifys, unclassified_reds, f)
 
-            sources, tns_names, savedates, classifys, class_dates, reds, users, unclassifys = read_ascii(f, startd) # Reload RCF source file with newly classified transients
+            sources, tns_names, savedates, classifys, class_dates, reds, users, unclassifys, unclassified_reds = read_ascii(f, startd) # Reload RCF source file with newly classified transients
 
     if option == 3 or option == 'all':
 
         print(bcolors.OKGREEN + 'Checking for updated photometry data...' + bcolors.ENDC)
 
         phot_sources = np.concatenate(([sources[s] for s in np.arange(0,len(sources)) if 'Ia' in classifys[s]], unclassifys))
+        phot_reds = np.concatenate(([reds[s] for s in np.arange(0,len(reds)) if 'Ia' in classifys[s]], unclassified_reds))
 
         for p in np.arange(0,len(phot_sources)):
             print(bcolors.OKCYAN + str(p+1) + '/' + str(len(phot_sources)) + bcolors.ENDC + ': ' + bcolors.OKBLUE + phot_sources[p] + bcolors.ENDC)
-            post_lc(phot_sources[p])
+            post_lc(phot_sources[p], phot_reds[p])
 
     if option == 4 or option == 'all':
 
@@ -126,6 +127,6 @@ while option != 0: # Select options
 
         print('There are ' + str(len(sources)) + ' objects saved or classified later than ' + str(startd) + ' with classifications.')
 
-        class_submission(sources, tns_names, classifys, class_dates, users) # Runs TNS submission script
+        class_submission(sources, tns_names, classifys, class_dates, users, reds) # Runs TNS submission script
 
 print('Submission complete. Goodbye!')
