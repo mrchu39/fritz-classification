@@ -54,8 +54,6 @@ SAND_upload_url = "https://sandbox-tns.org/api/"
 SAND_report_url = "https://sandbox-tns.org/api/bulk-report"
 SAND_reply_url = "https://sandbox-tns.org/api/bulk-report-reply"
 
-all_users = {}
-
 class bcolors:
 
     ''' Info : Colors for console output.
@@ -96,6 +94,7 @@ class TNSClassificationReport:
         self.groupID = ''
         self.spec_proprietary_period_value = ''
         self.spec_proprietary_period_units = ''
+
 
     def fill(self):
 
@@ -161,41 +160,20 @@ def api(method, endpoint, data=None, params=None, timeout=10):
             re_dict = response.json()
 
             if '429 Too Many Requests' in response.text:
-                time.sleep(5)
                 continue
 
             if json.loads(response.text)['status'] == 'error' and json.loads(response.text)['message'] == 'System provisioning':
                 print('System provisioning...')
-                time.sleep(30)
+                time.sleep(10)
                 continue
 
-            return response.status_code, re_dict
+            return re_dict
         except requests.exceptions.Timeout:
             print('Timeout Exception, restarting...')
-            time.sleep(5)
             continue
         except (json.decoder.JSONDecodeError, simplejson.errors.JSONDecodeError, requests.exceptions.SSLError, requests.exceptions.ConnectionError):
             #print('JSON Decode Error, restarting...')
-            time.sleep(5)
             continue
-
-def get_all_users():
-
-    # we grab the sitewide group that contains all users
-    url = BASEURL+'api/groups/1'
-    status, response = api('GET',url)
-
-    users = response['data']['users']
-
-    for user in users:
-        user_first = user['first_name']
-        user_last = user['last_name']
-        if user_first in (None, '') or user_last in (None, ''):
-            all_users[int(user['id'])] = user['username']
-        else:
-            all_users[int(user['id'])] = user_first[0] + '. ' + user_last
-
-get_all_users()
 
 def APO(specid):
 
@@ -234,7 +212,7 @@ def APO(specid):
 
     return OBSDATE.split(' \n')[0], EXPTIME.split(' \n')[0], OBSERVERS.split(' \n')[0], REDUCERS
 
-def class_submission(sources, tns_names, classifys, class_dates, users, redshifts):
+def class_submission(sources, tns_names, classifys, class_dates, users):
 
     ''' Info : Takes source list and submits those with classifications that have not been submitted prior by ZTF
         Input : source list, TNS names of sources, classifications, classifiction dates
@@ -242,8 +220,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
     '''
 
     sc = -1
-    print(len(sources), len(redshifts))
-    for red_index, source in enumerate(sources):
+    for source in sources:
         sc += 1
 
         print(bcolors.OKCYAN + str(sc+1) + '/' + str(len(sources)) + bcolors.ENDC + ': ' + bcolors.OKBLUE + source + bcolors.ENDC)
@@ -278,8 +255,8 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
             classify = classifys[sc]
             name = users[sc]
 
-            #if name == 'K. Hinds':
-            #    name == 'K. R. Hinds'
+            if name == 'K. Hinds':
+                name == 'K. R. Hinds'
 
             prior, type = check_TNS_class(ztfname)
 
@@ -320,7 +297,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
 
                     if inst == 'SEDM':
 
-                        auths = np.array(['W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
+                        auths = np.array(['S. Covarrubias', 'W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
 
                         if name != 'S. ZTF':
                             flag_1 = 0
@@ -354,7 +331,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
                         classificationReport.classificationID = get_TNS_classification_ID(classify)
-                        classificationReport.redshift = redshifts[red_index]
+                        classificationReport.redshift = get_redshift(ztfname)
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = obsdate
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
@@ -376,7 +353,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
 
                     elif inst == 'SPRAT':
 
-                        auths = np.array(['D. Perley (LJMU)', 'W. Meynardie', 'M. Chu', 'K. R. Hinds', 'C. Fremling']) ### Change accordingly
+                        auths = np.array(['D. Perley (LJMU)', 'S. Covarrubias', 'W. Meynardie', 'M. Chu', 'K. R. Hinds', 'C. Fremling']) ### Change accordingly
 
                         if name != 'S. ZTF':
                             flag_1 = 0
@@ -411,7 +388,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
                         classificationReport.classificationID = get_TNS_classification_ID(classify)
-                        classificationReport.redshift = redshifts[red_index]
+                        classificationReport.redshift = get_redshift(ztfname)
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = obsdate
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
@@ -427,7 +404,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
 
                     elif inst == 'ALFOSC':
 
-                        auths = np.array(['W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
+                        auths = np.array(['S. Covarrubias', 'W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
 
                         if name != 'S. ZTF':
                             flag_1 = 0
@@ -461,7 +438,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
                         classificationReport.classificationID = get_TNS_classification_ID(classify)
-                        classificationReport.redshift = redshifts[red_index]
+                        classificationReport.redshift = get_redshift(ztfname)
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = obsdate
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
@@ -491,7 +468,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
 
                     elif inst == 'DBSP' or inst == 'KAST':
 
-                        auths = np.array(['W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
+                        auths = np.array(['S. Covarrubias', 'W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
 
                         if name != 'S. ZTF':
                             flag_1 = 0
@@ -524,7 +501,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
                         classificationReport.classificationID = get_TNS_classification_ID(classify)
-                        classificationReport.redshift = redshifts[red_index]
+                        classificationReport.redshift = get_redshift(ztfname)
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = obsdate
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
@@ -552,7 +529,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
 
                     elif inst == 'LRIS':
 
-                        auths = np.array(['W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
+                        auths = np.array(['S. Covarrubias', 'W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
 
                         if name != 'S. ZTF':
                             flag_1 = 0
@@ -587,7 +564,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
                         classificationReport.classificationID = get_TNS_classification_ID(classify)
-                        classificationReport.redshift = redshifts[red_index]
+                        classificationReport.redshift = get_redshift(ztfname)
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = OBSDATE
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
@@ -615,7 +592,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
 
                     elif inst == 'NIRES':
 
-                        auths = np.array(['W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
+                        auths = np.array(['S. Covarrubias', 'W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
 
                         if name != 'S. ZTF':
                             flag_1 = 0
@@ -650,7 +627,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
                         classificationReport.classificationID = get_TNS_classification_ID(classify)
-                        classificationReport.redshift = redshifts[red_index]
+                        classificationReport.redshift = get_redshift(ztfname)
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = OBSDATE
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
@@ -678,7 +655,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
 
                     elif inst == 'GMOS_GS':
 
-                        auths = np.array(['W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
+                        auths = np.array(['S. Covarrubias', 'W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
 
                         if name != 'S. ZTF':
                             flag_1 = 0
@@ -713,7 +690,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
                         classificationReport.classificationID = get_TNS_classification_ID(classify)
-                        classificationReport.redshift = redshifts[red_index]
+                        classificationReport.redshift = get_redshift(ztfname)
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = OBSDATE
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
@@ -741,7 +718,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
 
                     elif inst == 'FLOYDS':
 
-                        auths = np.array(['W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
+                        auths = np.array(['S. Covarrubias', 'W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
                         
                         if name != 'S. ZTF':
                             flag_1 = 0
@@ -776,7 +753,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
                         classificationReport.classificationID = get_TNS_classification_ID(classify)
-                        classificationReport.redshift = redshifts[red_index]
+                        classificationReport.redshift = get_redshift(ztfname)
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = OBSDATE
                         classificationReport.expTime = (header['EXPTIME']['value'])
@@ -805,7 +782,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
 
                     elif inst == 'DIS':
 
-                        auths = np.array(['M. Graham (UW)', 'W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
+                        auths = np.array(['M. Graham (UW)', 'S. Covarrubias', 'W. Meynardie', 'M. Chu', 'C. Fremling (Caltech)']) ### Change accordingly
 
                         if name != 'S. ZTF':
                             flag_1 = 0
@@ -842,7 +819,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
                         classificationReport.asciiName = spectrum_name
                         classificationReport.classifierName = classifiers
                         classificationReport.classificationID = get_TNS_classification_ID(classify)
-                        classificationReport.redshift = redshifts[red_index]
+                        classificationReport.redshift = get_redshift(ztfname)
                         classificationReport.classificationComments = classification_comments
                         classificationReport.obsDate = obsdate
                         classificationReport.instrumentID = get_TNS_instrument_ID(inst)
@@ -880,9 +857,9 @@ def class_submission(sources, tns_names, classifys, class_dates, users, redshift
                     if proceed == 'y' and not proceed.strip() == '':
 
                         #ASCII FILE UPLOAD
-                        print("\n")
+                        print ("\n")
                         response = upload_to_TNS(files)
-                        print(response)
+                        print (response)
 
                         if not response:
                             print("File upload didn't work")
@@ -908,6 +885,7 @@ def check_TNS_class(ztfname):
     data = {'api_key' : API_KEY}
     headers={'User-Agent':'tns_marker{"tns_id":'+str(YOUR_BOT_ID)+', "type":"bot", "name":"'+YOUR_BOT_NAME+'"}'}
     response = requests.get('https://www.wis-tns.org/object/'+tns_name, headers=headers, data=data)
+
     class_data = response.text.split('Classification Reports', 2)[1]
 
     if 'no-data' in class_data.split('class="clear"')[0]:
@@ -941,7 +919,7 @@ def edit_comment(ztfname, comment_id, author_id, text, attach=None, attach_name=
 
     url = BASEURL+'api/sources/'+ztfname+'/comments/'+str(comment_id)
 
-    status, response = api('PUT', url, data=data)
+    response = api('PUT', url, data=data)
 
     return response
 
@@ -1031,7 +1009,7 @@ def get_all_spectra_id(ztfname):
     for i in range (get_all_spectra_len(ztfname)):
 
         url = BASEURL+'api/sources/'+ztfname+'/spectra'
-        status, response = api('GET',url)
+        response = api('GET',url)
 
         specid = response['data']['spectra'][i]['id']
         spec_id.append(specid)
@@ -1041,10 +1019,21 @@ def get_all_spectra_id(ztfname):
 def get_all_spectra_len(ztfname):
 
     url = BASEURL+'api/sources/'+ztfname+'/spectra'
-    status, response = api('GET',url)
+    response = api('GET',url)
     return len(response['data']['spectra'])
 
-def get_classification(source, man=False):
+def get_user(user_id):
+
+    resp = api('GET', 'https://fritz.science/api/user/'+str(user_id))
+
+    data = resp['data']
+
+    user_first = data['first_name']
+    user_last = data['last_name']
+
+    return user_first[0] + '. ' + user_last
+
+def get_classification(ztfname, man=False):
 
     ''' Info : Query the classification and classification date for any source
         Input : ZTFname
@@ -1052,20 +1041,22 @@ def get_classification(source, man=False):
         Comment : You need to choose the classification if there are multiple classifications
     '''
 
-    classifications = source['classifications']
+    url = BASEURL+'api/sources/'+ztfname+'/classifications'
+    response = api('GET',url)
+    output = response['data']
 
-    if (len(classifications) == 0):
+    if (len(output)< 1):
         classification = "No Classification found"
         probability = "None"
         classification_date = "None"
         user = 'None'
 
-    elif (len(classifications)==1):
+    elif (len(output)==1):
 
-        classification = classifications[0]['classification']
-        probability = classifications[0]['probability']
-        classification_date = classifications[0]['created_at'].split('T')[0]
-        user = all_users[classifications[0]['author_id']]
+        classification = response['data'][0]['classification']
+        probability = response['data'][0]['probability']
+        classification_date = response['data'][0]['created_at'].split('T')[0]
+        user = get_user(response['data'][0]['author_id'])
 
         if man == True:
 
@@ -1089,7 +1080,7 @@ def get_classification(source, man=False):
             classification_date = classification_date
             user = user
 
-    elif (len(classifications) > 1):
+    elif (len(output) > 1):
 
         classification = []
         classification_date = []
@@ -1097,12 +1088,12 @@ def get_classification(source, man=False):
         probability = []
         user = []
 
-        for i in range (len(classifications)):
+        for i in range (len(output)):
 
-            classify = classifications[i]['classification']
-            classify_date = classifications[i]['created_at']
-            prob = classifications[i]['probability']
-            us = all_users[classifications[i]['author_id']]
+            classify = response['data'][i]['classification']
+            classify_date = response['data'][i]['created_at']
+            prob = response['data'][i]['probability']
+            us = get_user(response['data'][i]['author_id'])
 
             classification.append(classify)
             probability=np.append(probability, prob)
@@ -1129,20 +1120,20 @@ def get_classification(source, man=False):
                     classification = classification[int(user_input)-1]
                     probability = probability[int(user_input)-1]
                     classification_date = classification_date[int(user_input)-1].split('T')[0]
-                    user = all_users[classifications[int(user_input)-1]['author_id']]
+                    user = get_user(response['data'][int(user_input)-1]['author_id'])
             else:
 
                 classification = classification[int(user_input)-1]
                 probability = probability[int(user_input)-1]
                 classification_date = classification_date[int(user_input)-1].split('T')[0]
-                user = all_users[classifications[int(user_input)-1]['author_id']]
+                user = get_user(response['data'][int(user_input)-1]['author_id'])
 
         else:
 
             classification = classification[np.argmax(classification_mjd)]
             probability = probability[np.argmax(classification_mjd)]
             classification_date = classification_date[np.argmax(classification_mjd)].split('T')[0]
-            user = all_users[classifications[np.argmax(classification_mjd)]['author_id']]
+            user = get_user(response['data'][np.argmax(classification_mjd)]['author_id'])
 
     return classification, probability, classification_date, user
 
@@ -1153,12 +1144,45 @@ def get_IAUname(ztfname):
         Returns : ATname
     '''
 
-    url = BASEURL + 'api/alerts_aux/' + ztfname
+    url = 'https://fritz.science/api/alerts_aux/'+ztfname
+    headers = {'Authorization': f'token {GETTOKEN}'}
 
-    status, response = api('GET', url)
+    while True:
 
-    if status != 404 and len(response['data'].get('cross_matches', {}).get('TNS',[])) != 0:
-        return response['data']['cross_matches']['TNS'][0]['name']
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+
+            if '429 Too Many Requests' in response.text:
+                continue
+
+        except requests.exceptions.Timeout:
+            print('Timeout...')
+            continue
+
+        except requests.exceptions.ConnectionError:
+            print('connection error')
+            print(response.text)
+            continue
+
+        try:
+            json.loads(response.text)['data']
+            break
+
+        except json.decoder.JSONDecodeError:
+
+            if response.text == '':
+                print(ztfname + ' has no data on Fritz')
+                return 'Not reported to TNS'
+
+            print(response.text)
+            continue
+
+        except KeyError:
+            print('key error')
+            print(response.text)
+
+    if response.status_code != 404 and 'cross_matches' in json.loads(response.text)['data'].keys() and len(json.loads(response.text)['data']['cross_matches']['TNS']) != 0:
+        return json.loads(response.text)['data']['cross_matches']['TNS'][0]['name']
 
     req_data = {
         "ra": "",
@@ -1202,11 +1226,20 @@ def get_number(group_id, date):
     '''
 
     num_sources = 0
-    
-    url = BASEURL + 'api/sources?saveSummary=true&group_ids=' + str(group_id) + '&numPerPage=50&pageNumber=1&savedAfter=' + date + 'T00:00:00.000001'
-    status, response = api('GET',url)
 
-    return response['data']['total_matches']
+    page = 1
+    while True:
+        url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id+'&numPerPage=50&pageNumber='+str(page)+'&savedAfter='+date+'T00:00:00.000001'
+        response = api('GET',url)
+
+        if len(response['data']['sources']) == 0:
+            break
+        else:
+            num_sources += len(response['data']['sources'])
+
+        page += 1
+
+    return num_sources
 
 def get_pprint(item, indent=0, tab=' '*4, maxwidth=float('inf')):
     """
@@ -1293,15 +1326,18 @@ def get_pprint(item, indent=0, tab=' '*4, maxwidth=float('inf')):
 
     return result
 
-def get_redshift(source, return_err=False):
+def get_redshift(ztfname, return_err=False):
 
     ''' Info : Query the redshift for any source
         Input : ZTFname
         Returns : redshift
     '''
 
-    redshift = source['redshift']
-    redshift_err = source['redshift_error']
+    url = BASEURL+'api/sources/'+ztfname
+    response = api('GET',url)
+
+    redshift = response['data']['redshift']
+    redshift_err = response['data']['redshift_error']
 
     if (redshift == None):
         redshift = "No redshift found"
@@ -1344,7 +1380,7 @@ def get_required_spectrum_id(ztfname, auto=False):
         for s in range (spec):
 
             url = BASEURL+'api/sources/'+ztfname+'/spectra'
-            status, response = api('GET',url)
+            response = api('GET',url)
 
             spec_name = response['data']['spectra'][s]['original_file_filename']
             spec_date = response['data']['spectra'][s]['observed_at']
@@ -1385,7 +1421,7 @@ def get_source_api(ztfname):
 
     while True:
         try:
-            status, response = api('GET',url, timeout=30)
+            response = api('GET',url, timeout=30)
             return response['data']
         except KeyError:
             continue
@@ -1410,7 +1446,7 @@ def get_spectrum_api(spectrum_id):
         Returns : list of spectrum jsons
     '''
     url = BASEURL+'api/spectrum/'+str(spectrum_id)
-    status, response = api('GET',url)
+    response = api('GET',url)
     return response
 
 def get_TNS_classification_ID(classification):
@@ -1450,7 +1486,7 @@ def get_total_number_of_sources(group_id):
     '''
 
     url = BASEURL+'api/sources?saveSummary=true&group_ids='+group_id
-    status, response = api('GET',url)
+    response = api('GET',url)
     return len(response['data']['sources'])
 
 def post_comment(ztfname, text, attach=None, attach_name=None):
@@ -1472,7 +1508,7 @@ def post_comment(ztfname, text, attach=None, attach_name=None):
 
     url = BASEURL+'api/sources/'+ztfname+'/comments'
 
-    status, response = api('POST', url, data=data)
+    response = api('POST', url, data=data)
 
     return response
 
@@ -1522,7 +1558,7 @@ def read_ascii(f, startd):
             users = np.append(users, users_r[i])
         if classifys_r[i] == 'No Classification found' and datetime.datetime.strptime(savedates_r[i], '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc) >= startd:
             unclassifys = np.append(unclassifys, sources_r[i])
-            unclassified_reds = np.append(unclassified_reds, reds_r[i])
+            unclassified_reds = np.append(unclassified_reds, str(reds_r[i]))
 
     return sources, tns_names, savedates, classifys, class_dates, reds, users, unclassifys, unclassified_reds
 
@@ -1545,9 +1581,6 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
     users = []
 
     listdir = os.getcwd()
-    # if there is no 'files' directory, create one
-    if not os.path.exists(listdir+'/files'):
-        os.makedirs(listdir+'/files')
     f = open (listdir+'/'+outfile+'.ascii','w')
     f.write('Source Name'+'\t'+'TNS Name'+'\t'+'Saved Date'+'\t'+'Classification'+'\t'+'Classification Date'+'\t'+'redshift'+'\t'+'user'+'\t'+'\n')
 
@@ -1561,24 +1594,24 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
 
     for page in tqdm(range(num_pages), desc='Total Progress', position=0):
 
-        path = BASEURL + 'api/sources?group_ids=' + str(groupnum) + '&numPerPage=50&pageNumber='+str(page+1)+'&savedAfter='+str(dat)+'T00:00:00.000001'
+        path = 'https://fritz.science/api/sources?group_ids=' + groupnum + '&saveSummary=true&numPerPage=50&pageNumber='+str(page+1)+'&savedAfter='+str(dat)+'T00:00:00.000001'
 
-        status, response = api('GET',path)
+        #print(path)
+
+        response = api('GET',path)
 
         if len(response['data']['sources']) == 0:
             break
 
         for i in tqdm(range(len(response['data']['sources'])), desc='Page ' + str(page+1) + ' of ' + str(num_pages), position=1, leave=False):
-            time.sleep(.1)
-            if i % 5 == 0:
-                time.sleep(1)
-            source_name = response['data']['sources'][i]['id']
-            # to get the saved_at, get the 'saved_at' from the group with id = GROUPNUM
-            group = [group for group in response['data']['sources'][i]['groups'] if group['id'] == GROUPNUM][0]
-            saved_date = group['saved_at']
-            classification, prob, date, user = get_classification(response['data']['sources'][i])
+
+            source_name = response['data']['sources'][i]['obj_id']
+            saved_date = response['data']['sources'][i]['saved_at']
+            classification, prob, date, user = get_classification(source_name)
             IAU = get_IAUname(source_name)
-            red = str(get_redshift(response['data']['sources'][i]))
+            red = str(get_redshift(source_name))
+
+            #print (i, source_name)
 
             srcs.append(source_name)
             TNS.append(IAU)
@@ -1610,7 +1643,7 @@ def submit_fritz_class(ztfname, clas):
 
     url = BASEURL+'api/classification'
 
-    status, response = api('POST', url, data=data)
+    response = api('POST', url, data=data)
 
     return response
 
@@ -1626,7 +1659,7 @@ def submit_fritz_redshift(ztfname, redshift,redshift_err):
 
     url = BASEURL+'api/sources/'+ztfname
 
-    status, response = api('PATCH', url, data=data)
+    response = api('PATCH', url, data=data)
 
     return response
 

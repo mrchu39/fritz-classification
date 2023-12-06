@@ -72,7 +72,8 @@ def get_photometry(ztfname, format='flux'):
     elif format == 'mag':
         data = {'format': 'mag'}
 
-    status, response = api('GET', url, params=data, timeout=10)
+    api_dict = api('GET', url, params=data, timeout=10) #defined in order to call values 
+    status, response, vers = api_dict.values()
 
     if format == 'flux':
 
@@ -83,7 +84,7 @@ def get_photometry(ztfname, format='flux'):
         zpsys = []
         zp = []
 
-        for d in response['data']:
+        for d in response:
             if d['flux'] != None and (d['filter'] == 'ztfg' or d['filter'] == 'ztfr'):
                 flux.append(d['flux'])
                 fluxerr.append(d['fluxerr'])

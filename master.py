@@ -127,6 +127,7 @@ while option != 0: # Select options
 
         print('There are ' + str(len(sources)) + ' objects saved or classified later than ' + str(startd) + ' with classifications.')
 
-        class_submission(sources, tns_names, classifys, class_dates, users, reds) # Runs TNS submission script
+        class_submission(sources, tns_names, classifys, class_dates, users)#, reds) # Runs TNS submission script
+#removed reds temporarily
 
 print('Submission complete. Goodbye!')
