@@ -1611,7 +1611,7 @@ def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - da
             IAU = get_IAUname(source_name)
             red = str(get_redshift(source_name))
 
-            #print (i, source_name)
+            #print(saved_date)
 
             srcs.append(source_name)
             TNS.append(IAU)
