@@ -1562,13 +1562,16 @@ def read_ascii(f, startd):
 
     return sources, tns_names, savedates, classifys, class_dates, reds, users, unclassifys, unclassified_reds
 
-def sourceclassification(outfile, dat=str(datetime.datetime.utcnow().date() - datetime.timedelta(days=180))):
+def sourceclassification(outfile, dat=None):
 
     ''' Info : Downloads list of transients on Fritz saved after specified date (or since 180 days prior if no input)
                Saves ZTF names, TNS names, dates saved, classifications, classifications, redshifts as ASCII file
         Input : outfile name, date to check after
         Returns : None
     '''
+    if dat in ['', None]:
+        dat = str(datetime.datetime.utcnow().date() - datetime.timedelta(days=180))
+
 
     #print('data received')
 

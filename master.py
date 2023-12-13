@@ -69,6 +69,7 @@ f = ascii.read("RCF_sources.ascii", delimiter='\t') #ascii file containing the n
 
 sources, tns_names, savedates, classifys, class_dates, reds, users, unclassifys, unclassified_reds = read_ascii(f, startd) # Parses data from ASCII file according to previous input
 
+ 
 option = ''
 while option != 0: # Select options
     print('1: Check for missing redshifts\n2: Classify unclassified sources\n3: Check and upload light curve data\n4: Associate hosts with saved sources\n5: Submit Fritz classifications to TNS')
@@ -86,6 +87,7 @@ while option != 0: # Select options
             submit_reds(sources[reds=='No redshift found'], f)
 
             sources, tns_names, savedates, classifys, class_dates, reds, unclassifys, unclassified_reds = read_ascii(f, startd) # Reload RCF source file with transients with newly determined redshifts
+
 
     if option == 2 or option == 'all':
 
