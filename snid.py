@@ -783,8 +783,13 @@ def specplot(x, y, xi, yi, snid_type, fname, output, best_num, z_template, z_tem
     fig.subplots_adjust(left=0.055,right=0.99,top=0.925,bottom=0.145)
     fig.savefig(output + 'snidfits_emclip_' + fname + "_" + str(best_num) + '.png', dpi = 600)
     #print(output + 'snidfits_emclip_' + fname + "_" + str(best_num) + '.png')
-    plt.close(fig)
-    plt.close()
+    if rlap >= 7:
+        plt.show(block=False)
+"""
+    else:
+        plt.close(fig)
+        plt.close()
+"""
 
 def submit_class(unclassifys, unclassified_reds, f):
 
