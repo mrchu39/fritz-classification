@@ -1037,7 +1037,7 @@ def get_classification(ztfname, man=False):
 
     ''' Info : Query the classification and classification date for any source
         Input : ZTFname
-        Returns : Classification and Classification date
+        Returns : Classification, Propability, Classification date, User
         Comment : You need to choose the classification if there are multiple classifications
     '''
 
