@@ -288,6 +288,12 @@ def plot_best_5(source, output, spectra_name, z_snid, top_5, rlaps, show_redshif
         xi /= (1+z)
         x, y = i[1]["redshifted_wavelength"] / (1+z), i[1]["flux"]
         specplot(x,y,xi,yi,snid_type,spectra_name,output,i[0][0], z, i[0][4], z_snid, spec_num, rlaps[spec_num], show_redshift=show_redshift)
+"""
+        if spec_num == 1 and rlaps[spec_num] >= 9.5:
+            plt.show(block=False)
+        elif spec_num <= 3 and rlaps[spec_num] >= 8.5:
+            plt.show(block=False)
+"""
 
 def read_tables(files):
     matches_files = files[0:len(files)-1]
@@ -783,8 +789,6 @@ def specplot(x, y, xi, yi, snid_type, fname, output, best_num, z_template, z_tem
     fig.subplots_adjust(left=0.055,right=0.99,top=0.925,bottom=0.145)
     fig.savefig(output + 'snidfits_emclip_' + fname + "_" + str(best_num) + '.png', dpi = 600)
     #print(output + 'snidfits_emclip_' + fname + "_" + str(best_num) + '.png')
-    if rlap >= 9.5:
-        plt.show(block=False)
 
     #plt.close(fig)
     #plt.close()
