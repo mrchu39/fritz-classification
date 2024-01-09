@@ -1812,10 +1812,14 @@ def write_ascii_file(ztfname, path=os.getcwd(), auto=False):
         header = (a['data']['altdata'])
 
         if len(header) > 0:
-            s = (ztfname+'_'+str(header['OBSDATE'].split('T')[0])+'_'+str(inst)+'.ascii')
+            try:
+                s = (ztfname+'_'+str(header['OBSDATE'].split('T')[0])+'_'+str(inst)+'.ascii')
+            except KeyError:
+                s = (ztfname+'_'+str(a['data']['observed_at'].split('T')[0])+'_'+str(a['data']['instrument_name'])+'.ascii')
 
         else:
             s = (ztfname+'_'+str(a['data']['observed_at'].split('T')[0])+'_'+str(a['data']['instrument_name'])+'.ascii')
+
 
         with open(path+'/data/'+s,'w') as f:
             f.write(a['data']['original_file_string'])

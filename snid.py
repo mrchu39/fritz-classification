@@ -294,7 +294,6 @@ def plot_best_5(source, output, spectra_name, z_snid, top_5, rlaps, show_redshif
         elif spec_num <= 3 and rlaps[spec_num] >= 8.5:
             plt.show(block=False)
 """
-
 def read_tables(files):
     matches_files = files[0:len(files)-1]
     spectra = Table.read(files[-1], format = "ascii", names = ["wavelength", "flux"])
