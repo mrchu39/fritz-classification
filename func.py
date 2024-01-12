@@ -272,7 +272,7 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                     if input(ztfname + ' classified on Fritz as ' + classify + ', submit another classification? [y/n] ') != 'y':
                         continue
 
-            spectrum_info = write_ascii_file(ztfname) #returns "spectrum_name"
+            spectrum_info = write_ascii_file(ztfname, auto = True) #returns "spectrum_name"
             spectrum_name = spectrum_info[0]
 
             if spectrum_name != 'No Spectra Found' and spectrum_name != 'Resuming...':
@@ -1373,42 +1373,44 @@ def get_required_spectrum_id(ztfname, auto=False):
 
         spec_id = get_all_spectra_id(ztfname)
 
-        #if auto==True and len(spec_id) == 1:
-        #    print(ztfname + ' automatically selected spectrum with ID ' + str(spec_id[0]))
-        #    return spec_id[0]
+        if auto==True and len(spec_id) == 1:
+            print(ztfname + ' automatically selected spectrum with ID ' + str(spec_id[0]))
+            return spec_id[0]
 
-        for s in range (spec):
+        else:
 
-            url = BASEURL+'api/sources/'+ztfname+'/spectra'
-            response = api('GET',url)
+            for s in range (spec):
 
-            spec_name = response['data']['spectra'][s]['original_file_filename']
-            spec_date = response['data']['spectra'][s]['observed_at']
-            instid = response['data']['spectra'][s]['id']
+                url = BASEURL+'api/sources/'+ztfname+'/spectra'
+                response = api('GET',url)
 
-            name.append(spec_name)
-            date.append(spec_date.split('T')[0])
-            instids.append(instid)
+                spec_name = response['data']['spectra'][s]['original_file_filename']
+                spec_date = response['data']['spectra'][s]['observed_at']
+                instid = response['data']['spectra'][s]['id']
 
-        print ("Please choose from the following spectra (enter 0 to resume): \a\n")
+                name.append(spec_name)
+                date.append(spec_date.split('T')[0])
+                instids.append(instid)
 
-        for i in range (len(name)):
-            print ((i+1),")", "instrument id: ", instids[i], "spectrum name: ", name[i], "spectrum date:", date[i])
+            print ("Please choose from the following spectra (enter 0 to resume): \a\n")
 
-        wb.open(BASEURL+'source/'+ztfname, new=2)
+            for i in range (len(name)):
+                print ((i+1),")", "instrument id: ", instids[i], "spectrum name: ", name[i], "spectrum date:", date[i])
 
-        while True:
-            user_input = input("Choose spectrum to upload: ")
+            wb.open(BASEURL+'source/'+ztfname, new=2)
 
-            if user_input == '0':
-                return 0
-            else:
-                try:
-                    specid = spec_id[int(user_input)-1]
+            while True:
+                user_input = input("Choose spectrum to upload: ")
 
-                    return specid
-                except (IndexError, ValueError):
-                    continue
+                if user_input == '0':
+                    return 0
+                else:
+                    try:
+                            specid = spec_id[int(user_input)-1]
+
+                            return specid
+                    except (IndexError, ValueError):
+                        continue
 
     return specid
 
