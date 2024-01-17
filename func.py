@@ -1374,6 +1374,9 @@ def get_required_spectrum_id(ztfname, auto=False):
         spec_id = get_all_spectra_id(ztfname)
 
         if auto==True and len(spec_id) == 1:
+
+            wb.open(BASEURL+'source/'+ztfname, new=2)
+
             print(ztfname + ' automatically selected spectrum with ID ' + str(spec_id[0]))
             return spec_id[0]
 
