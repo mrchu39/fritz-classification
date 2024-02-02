@@ -874,6 +874,11 @@ def class_submission(sources, tns_names, classifys, class_dates, users):
                         if tns_feedback(report_id) == True:
                             post_comment(ztfname, 'Uploaded to TNS')
 
+                        #Update TNS name in fritz
+                        url = BASEURL+'api/sources/'+ztfname+'/tns?radius=2&tnsrobotID=1012'
+                        response = api('GET', url)
+
+
 def check_TNS_class(ztfname):
 
     ''' Info : Checks TNS page for other classification reports
